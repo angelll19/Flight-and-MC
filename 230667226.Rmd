@@ -1,0 +1,1928 @@
+---
+title: "ST2195_part2"
+author: "angelf"
+date: "2025-02-18"
+output:
+  html_document: default
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, eval=FALSE)
+```
+
+
+Install the required library. There will be function provided below that can be run, to check whether it's installed or not. If it's not installed, it will automatically install.
+
+```{r}
+#install.packages("lubridate")
+#install.packages("dplyr")
+#install.packages("ggplot2")
+#install.packages("caret")
+#install.packages("pROC")
+#install.packages("mlr3")
+#install.packages("mlr3learners")
+#install.packages("mlr3pipelines")
+
+
+```
+
+
+This function will automatically check whether the packages or library used are already installed or not. If it's installed, it should shown on the installed.packages() on its rownames. If it's there, the message "It have been installed" will appear. If not installed (not satisfy the first condition), it will run the install.packages(x) and install it. 
+```{r}
+library_used <- function(packages) {
+  for (x in packages){
+    if ((x %in% rownames(installed.packages()))) {
+      message("It have been installed")
+    } else{
+      install.packages (x)
+    }
+  }
+}
+```
+
+```{r}
+used_libr <- c("dplyr","ggplot2","lubridate","caret","pROC","ROSE","mlr3","mlr3learners","mlr3pipelines", "corrplot", "RColorBrewer")
+library_used(used_libr)
+```
+
+These library will be used later. 
+```{r} 
+library(dplyr)
+library(ggplot2)
+library(lubridate)
+library(caret)
+library(pROC)
+library(ROSE)
+library(mlr3)
+library(mlr3learners)
+library(mlr3pipelines)
+library(corrplot)
+library(RColorBrewer)
+```
+
+
+### To answer number 1 a and b :
+
+In order to create reproducibility, set.seed(123) is used here.
+ggplot2 package is needed to do visualisation in later part.
+
+```{r}
+set.seed(123)
+
+```
+
+
+
+probability_density_fn is the variable created to store the **f(x) =1/2 exp (−|x|)**. The parameter is num which is in numeric type. "formula" follows the f(x). The probability_density_fn will return the formula.
+```{r}
+probability_density_fn <- function (num){
+  num <- as.numeric(num)
+  formula <- (1/2) * exp(-abs(num))
+  return (formula)
+}
+
+```
+
+Define X0, N, and s, where X0 is the initial value which is 0, N is the positive integer, and s is the positive real number .
+```{r}
+X0 <- 0
+N <- 10000
+s <- 1
+```
+
+
+
+
+A function called "step" is created with parameters initial_value, num_of_sample, and s The random_num is firstly defined as a vector with "N+1" numbers inside. As it hasn't been set up, there will be N+1 number of 0. Next, the first index of random_num will be the value of X0. This also the reason why N+1 instead of N. The X0 will be included in the first index, therefore to generate N random number + one initial value, N+1 will be generated. 
+
+previous_num is defined as random_num with current index minus 1. This will be used on x_star where the random samples will be generated. The x_star will generate one number with mean previous_num and standard deviation s.
+
+ratio_formula is created to calculate the ratio (R= f(X*) / f(Xi-1)). "fx" and "fx_1" are calculated using the function of distribution created before. While in fx the parameter will be x_star, in "fx_1" the parameter will be previous_num.
+
+"u" is created to generate a random uniform number between 0 and 1. To minimize the error, a log function is used. Based on the rules given, if log(u) less than log(ratio_formula), the x_star will be stored in random_num. Otherwise, the x_star will be rejected and the previous number will be stored again.
+
+
+```{r}
+step <- function(initial_value, num_of_sample, s){
+  random_num <- numeric(N+1) 
+  random_num[1]<- X0 
+  for (i in 2: N+1) {
+    previous_num <- random_num[i-1] 
+    x_star<- rnorm(1, mean = previous_num, sd =s ) 
+    
+    fx <- probability_density_fn(x_star)
+    fx_1 <- probability_density_fn(previous_num)
+    ratio_formula <- fx/fx_1
+    
+    u <- runif(1)
+    
+    if (log(u) < log(ratio_formula)) {
+      random_num[i] <- x_star  
+    } else if ( log(u) >= log(ratio_formula)) {
+      random_num[i] <- random_num[i-1]  
+    } 
+  }
+  
+  return (random_num)
+  
+}
+
+```
+
+
+
+The function "step" that has been created before is used here with intial_value = X0, num_of_sample = N, and s= s.This will be stored in answer_a
+
+```{r}
+
+answer_a <-step(X0,N, s)
+```
+
+data_1 will stored the answer_a in data frame
+
+Histogram of random samples with the kernel density will be shown and compared with the actual distribution function(probability_density_fn). The histogram, kernel, and distribution curve will be in green, red, and blue respectively. The graph shows that the random sample will looks similar to the actual distribution curve 
+
+Here, ggplot2 packages will be used. Before doing the visualization, the answer_a must be stored in a data frame in a variable called “data_1”. Then it will be used in ggplot(). The x = answer_a refers to the “data_1” variable where the columns name called answer_a. Geom_histogram used to plot histogram, where there’s “y= ..density..” which ask to generate the density on the y axis rather than frequency count. Bins of 50 is used here, so the samples will be grouped into 50 intervals. Geom_density is used to create kernel density where the kernel used here is “gaussian”. Stat_function is used to create a dashed curve of actual distribution f(x) which has been stored in probability_density_function. Annotate is used to create label of each curve to increase readability. 
+
+```{r}
+data_1 <- data.frame(answer_a)
+```
+
+
+```{r}
+ggplot(data_1, aes(x= answer_a))+
+  geom_histogram(aes(y= ..density..), bins= 50,color="white",fill= "lightgreen")+
+  geom_density(aes(y= ..density..), color="red", size=1.1, kernel="gaussian")+
+  stat_function(fun= probability_density_fn, color="royalblue", size=0.8, linetype="dashed")+
+  labs(title= "Histogram, Kernel Density, Distribution Curve ", x= "Value", y="Density")+  
+  annotate("label", x = 1.9, y = 0.27, label = "Kernel Density", color = "darkred", size = 2, fill="peachpuff") +
+  annotate("label", x = 1.2, y = 0.46, label = "Actual f(x)", color = "blue", size = 2, fill="powderblue") +
+  theme_minimal()
+```
+
+The sample mean and standard deviation will be calculated
+
+```{r}
+a_sample_mean <- mean(answer_a)
+a_sample_sd <- sd(answer_a)
+cat("Sample_mean: ", a_sample_mean,"\nStandard Deviation:", a_sample_sd)
+```
+
+part_b function will be created with parameter N, s, and J. 
+chains_of_j will create a vector of list with length J
+mean_of_j will create a vector with length J, where inside the will be NA. This is also implied on var_of_j.
+
+initial_value is the X0 where it's generated randomly through standard normal distribution. This is being done to create a different X0 value for each chain.
+
+Function from the part a can be used to generate random numbers, where new initial_value will be used (stored in numbers_list). chains_of_j[[j]] will store the random number with chain j. mean_of_j[j] is the mean of the random number in each chain. This implies the same on variance. Sample_var_w and sample_mean_m will calculate the mean and variance in overall average of all chains. The “calculation” variable will be used to calculate between_sample_variance. As well as “calculate” variable which is used to calculate R_hat. This function will return R_hat value.
+
+
+```{r}
+part_b <- function(N,s,J) {
+  chains_of_j <- vector("list",J)
+  mean_of_j <- numeric(J)
+  var_of_j <- numeric(J)
+  
+  
+  for (j in 1:J){
+    initial_value <- rnorm(1, mean=0, sd= 1)
+    numbers_list <- step(intial_value, N,s)
+    chains_of_j[[j]] <- numbers_list
+    
+    mean_of_j[j] <- mean(chains_of_j[[j]])
+    var_of_j[j] <- var(chains_of_j[[j]])
+}                 
+    sample_var_w <- mean(var_of_j)
+    sample_mean_m <- mean(mean_of_j)
+    calculation <- (mean_of_j - sample_mean_m)^2
+    between_sample_variance <- mean(calculation)
+    calculate <- (between_sample_variance + sample_var_w) / sample_var_w
+    R_hat <- sqrt (calculate)
+  
+    return (R_hat)
+}
+
+```
+
+
+
+st is defined as a sequence that starts from 0.001 to 1 which increases by 0.005 for each value. It will be around 200 values that will be used in the visualisation. R_hat_value will be in vector form. answer_b is generated using the part_b function which includes parameter N = 2000, s= st for all values in st, and J=4. R_hat_value will be calculated through answer_b and it will be stored based on the length of st.
+
+
+
+```{r}
+st <- seq(0.001,1, by= 0.005 )
+R_hat_value <- c()
+for (y in 1:length(st) ) {
+  answer_b <- part_b(2000, st[ y],4)
+  R_hat_value[y] <- answer_b
+}
+```
+
+In order to visualise the plot, the "result" variable will be created in the data frame forms which contain st and R_hat_value
+```{r}
+result <- data.frame(st, R_hat_value)
+```
+
+
+The packages of ggplot2 is needed to visualize the graph. The ggplot2 package is used. This is visualized using “result” as the data, where x axis will value st and y axis will follow R_hat_value. It shows the value of R given the s= 0.001 to 1. There will be a red line which indicates the R value when it equals 1.05. The scale_y_continuos is used to set the limit of y axis so that it range from 1 to 1.1
+
+
+```{r, warning= FALSE}
+
+ggplot(result, aes(x= st, y= R_hat_value))+
+  geom_line(color="darkorchid")+
+  geom_point(color="plum",size= 0.9)+
+  geom_hline(yintercept=1.05, color="tomato")+
+  labs(title="Values of R", subtitle ="Given Interval of s", x= "s Value", y="R value")+
+  scale_y_continuous(limits = c(1, 2))+
+  theme_minimal()
+
+```
+
+
+Part 2
+
+
+1. Set variable call "years" that contains 2000,2001,2002,2003, and 2004.
+2. Create an empty list call "data".
+3. Use for loop function to read data from 2000 to 2004. Since the file name is are structured based on the year, which is "year.csv", function can be used.
+4. Combine the rows from the "data" variable into a single data frame that contains years from 2000 to 2004.
+
+```{r}
+years <- 2000:2004 
+
+data <- list() 
+
+for(x in years){
+  name_of_csv <- paste0(x, ".csv")
+  cat("Reading file:", name_of_csv, "\n") 
+  data_1 <- read.csv(name_of_csv, header= TRUE)
+  data[[as.character(x)]] <- data_1
+  
+} 
+
+datas <- do.call(rbind, data) 
+
+```
+
+There's high correlation between departure and arrival delay around 0.8945 which is a positive linear relationship. This means the higher the departure delay, the higher the arrival delay. It calculated by ignoring NA's values.
+
+```{r}
+cor(datas$DepDelay, datas$ArrDelay, use="complete.obs") #ignoring Na's
+```
+
+"delayed_dep" will store data that contains flight with departure delay. It's defined as flight that delayed for 15 minutes or more (DepDelay>=15). As not all data is used, it will select some columns. Here it will use only data that is not cancelled and not diverted. "Yearly" variable will be created from "Year" variable in date format.
+
+The reason why NA is not removed here, as it will be automatically dropped in by using filter (DepDelay >= 15). As only DepDelay will be used for calculation in the next steps. This also the reason to prevent losing much more data by droping NA that might not affect the calculation. 
+
+Delay is defined as all flights that arrive or depart exceed the scheduled time by 15 minutes or more (OAG wesbite). 
+
+```{r}
+delayed_dep <- datas%>%
+  select (Diverted, DepDelay, DayOfWeek, Cancelled, Year)%>%
+  filter(Cancelled == 0 &Diverted==0& DepDelay>=15) %>%
+  mutate(Yearly = as.Date (paste0(Year,"-01-01"), format="%Y-%m-%d"))
+
+```
+
+The dplyr package is used.
+
+Aggregation will be performed. It will use the data from "delayed_dep", then it will pipe into next line, which is group it by "Yearly" and "DayOfWeek", that calculate the total departure delay(Total_delay), average departure delay(Avg_delay), and frequency of delay (Count_delay). It will mutate a new column called "Year", with a date format of Year.
+
+```{r}
+delays_dep_per_day <- delayed_dep%>%
+  group_by(Yearly,DayOfWeek)%>%
+  summarise(Total_delay = sum(DepDelay),
+            Avg_delay= mean(DepDelay),
+            Count_delay= n())%>%
+  mutate(Year = year(Yearly))
+summary(delays_dep_per_day) #ensure there's no NA's
+
+```
+
+delays_per_day_2 variable will be created that contains data from delays_dep_per_day that will be grouped by Yearly (year), and create a new column call colour_2, so when it's the highest average delay then denote it as "High Delay", when it's the lowest delay denote it as "Low Delay", the other values will be denoted as "Medium". This will be used for the visualisation purpose. 
+
+```{r}
+delays_per_day_2 <- delays_dep_per_day %>%
+  group_by(Yearly) %>%
+  mutate(colour_2 = case_when (
+    Avg_delay == max(Avg_delay) ~"High Delay",
+    Avg_delay == min (Avg_delay) ~ "Low Delay",
+    TRUE ~ "Medium"
+  ))
+
+```
+
+
+```{r}
+tail(delays_per_day_2) #to see the bottom 5 rows
+```
+
+This will displays line chart by year, that shows the average departure delay from Mon (1) to Sun (7). The red color indicates the highest average delay, while green color shows the lowest average delay. 
+
+It can be seen average arrival delay consistently low in Saturday across the year. Even though in 2001 Saturday is not the lowest, it only have minor differences with the lowest average delay (under 1 minutes).
+
+Tuesday might be good in 2000 and 2001 but the trend is changing since 2002, where it's increasing in delay average time.
+
+However, it should be noted that the different of average delay from Monday to Sunday are small, which around 6 minutes differences.
+
+```{r}
+ggplot(delays_per_day_2, aes(x= DayOfWeek, y = Avg_delay, group=Year, colour = colour_2))+
+  geom_line(colour= "black")+
+  geom_point()+
+  scale_color_manual(values= c("High Delay" ="darkred", "Low Delay"="darkgreen", "Medium"="darkgrey"),name= "Delay")+ #highlight the highest and lowest average departure delay
+  scale_x_continuous(breaks= 1:7)+#it shows the x axis from 1 to 7 without skipping any of it
+  facet_wrap(~Year)+ #visualise it by year
+  labs(title="Average Dep Delay by Day of Week in 2000-2004", x= "Day of Week", y= "Average Dep Delay", subtitle= "Dep Delay is defined as DepDelay >=15")+
+  theme_minimal()+
+  geom_label(aes(label= round(Avg_delay,1)), size= 2.5, vjust= -0.5, show.legend = FALSE)+#put Avg_delay as label with one decimal point.
+  ylim(c(44,65))+
+  theme(plot.subtitle = element_text(size= 6)) #change the size of subtitle
+
+```
+
+
+1. ratio_delay_dofs use datas dataframe, that will filter out the cancelled and diverted flight. Then it will create a new column call Total_Arr_Delay which contains binary number, 1 represents the departure delay is more or equals to 15, otherwise 0.
+2. ratio_delay_dof will contains ratio_delay_dofs, then it will group by Year and DayOfWeek. Then, the total number of delay (Delay_flight), total number of delayed flight (Total_flight) will be calculated. It then create a new column call Ratio_of_delay, which calculate the ratio of delay (total of delayed flight/ total flight) which is rounded into 1 decimal point and it's in percentage form. 
+3. It will use ratio_delay_dof and then create a new variable called "colour_1" where the lowest ratio of delay will be written as Low Ratio. the highest ratio of departure delays written as high ratio, otherwise it will write as medium ratio (for visualisation purpose).
+
+
+```{r}
+#1
+ratio_delay_dofs <- datas%>%
+  select(Cancelled, Diverted, Year, DayOfWeek, DepDelay,CRSDepTime)%>%#CRSDepTime will be used on the best time of day in the later part
+  filter(Cancelled ==0 &Diverted ==0)%>%
+  mutate(Total_Arr_Delay = ifelse(DepDelay>=15, 1,0)) 
+
+#2
+ratio_delay_dof <- ratio_delay_dofs%>%
+  group_by(Year, DayOfWeek)%>% #group it by year and day of week
+  summarise(Delay_flight = sum(Total_Arr_Delay),
+            Total_flight = n())%>%
+  mutate(Ratio_of_delay =  round(Delay_flight/Total_flight *100,1))
+
+#3
+#this will be used for visualisation purpose
+ratio_delay_dof<- ratio_delay_dof %>%
+  mutate(colour_1 = case_when (
+    Ratio_of_delay == min(Ratio_of_delay) ~"Low Ratio" , #when ratio is the lowest, it's named as Low Ratio
+    Ratio_of_delay == max (Ratio_of_delay) ~ "High Ratio" ,#when ratio is the lowest, it's named as High Ratio
+    TRUE ~ "Medium Ratio" #other values are Medium Ratio
+  ))
+
+```
+
+
+This will visualise the ratio of departure delay in each day, by year. It will highlight the highest and lowest ratio with red and green colour respectively. It will show label near the bar chart only if it's the highest or the lowest ratio. However, for report purpose, the Saturday ratio will be shown. 
+
+Frequency of delay isn't a good measure. High frequency of delays just shows that delay is happen frequently on that day, which ignores the total number of flights. High frequency of delay might occur due to high number of flights and vice versa. Therefore, ratio must be calculated and be shown.
+
+Friday have the highest ratio of departure delay. The biggest difference between ratio of departure delay is in 2000, where it’s around 9 % difference that indicates delay likely to be happen more in Friday rather than the lowest ratio day.
+
+It can be seen Tuesday have low ratio of delay in 2000 -2003. While departure delay in Saturday is as low as Tuesday in 2003. In 2004, Saturday become the lowest ratio of delay.
+
+```{r}
+ggplot(ratio_delay_dof, aes(x= DayOfWeek,y = Ratio_of_delay, fill= colour_1))+
+  geom_bar(stat='identity')+
+  facet_wrap(~Year)+ #displays it by year
+  labs(title= "Dep Delay Ratio (%) by Day of Week in 2000-2004", subtitle= "Delay ratio is calculated from total delayed flight / total flight times 100", x = "Day of Week", y="Dep Delay Ratio")+
+  scale_fill_manual(values= c( "Low Ratio" ="darkgreen", "High Ratio"= "darkred", "Low Ratio"= "gray" ), name= "Ratio")+ #color it based on the ratio of departure delay
+  geom_text(aes(label= ifelse(colour_1 == "Low Ratio" | colour_1 == "High Ratio"| DayOfWeek == 6, paste(Ratio_of_delay,"%"),"")), size= 2.5, vjust= -.6)+ # it shows the ratio with percentage format, only if the ratio is the lowest or the highest.
+  theme_minimal()+
+  ylim (c(0,30))+
+  theme(plot.subtitle = element_text(size =6))
+```
+
+
+
+
+"delayed_arr" will store data that contains flight with arrival delay. This is calculated when flight have arrival delay more than or equals to 15 minutes (ArrDelay>=15) and the departure delay is less than 15 minutes (DepDelay <15). This have been done to avoid double counting, as there's high correlation between arrival delay and departure delay. To avoid this, arrival delay is counted when the delay is not caused by departure delay. 
+
+As not all data is used, it will select some columns. Here it will use only data when the flight is not cancelled and not diverted. The DayOfWeekName column will be created that containing day of week label such as Mon to Sun, as the original data (DayOfWeek) contains only int from 1 to 7.
+
+```{r}
+delayed_arr <- datas%>% 
+  select (Diverted,ArrDelay, DepDelay, DayOfWeek, Cancelled, Year)%>% #Not all columns are neccesary for calculation, therefore some columns are being selected
+  filter(Cancelled == 0 &Diverted ==0 & ArrDelay>=15 & !(DepDelay >=15)) #it filter when cancelled is 0, this mean the flight is not cancelled. Diverted is equals to 0, means the flight is not diverted
+
+summary(delayed_arr) #ensure there's no NA's
+
+```
+
+
+The year, month, and date data are available, however it's stored as int instead of data. Therefore here, it will create a new column call Yearly, that will create the Year in date format.
+```{r}
+delayed_arr<- delayed_arr%>%
+  mutate(Yearly = as.Date (paste0(Year,"-01-01"), format="%Y-%m-%d"))
+#it will create yearly column in date format, where it will paste the original year with -01-01, so that it will be in default format which is year-month-date (%Y-%m-%d)
+
+```
+
+
+Aggregation will be performed. It will use the data from "delayed_arr", then it will pipe into next line, which is group it by "Yearly" and "DayOfWeek", that calculate the total arrival delay(Total_delay), average arrival delay(Avg_delay), and frequency of delay (Count_delay).
+```{r}
+delays_per_day <- delayed_arr%>%
+  group_by(Yearly,DayOfWeek)%>%
+  summarise(Total_delay = sum(ArrDelay),
+            Avg_delay= mean(ArrDelay),
+            Count_delay= n()) #count the frequency of delay
+```
+
+It will mutate a new column called "Year", with a date format of Year.
+```{r}
+delays_per_day <- delays_per_day%>%
+  mutate(Year = year(Yearly))
+#to create Year column as the year from the Yearly column (date format)
+```
+
+
+delays_per_day_1 variable will be created that contains data from delays_per_day that will be grouped by Yearly (year), and create a new column call colour_2, so when it's the highest average delay then denote it as "High Delay", when it's the lowest delay denote it as "Low Delay", the other values will be denoted as "Medium". This will be used for the visualisation purpose.
+
+```{r}
+delays_per_day_1 <- delays_per_day %>%
+  group_by(Yearly) %>%
+  mutate(colour_2 = case_when (
+    Avg_delay == max(Avg_delay) ~"High Delay",
+    Avg_delay == min (Avg_delay) ~ "Low Delay",
+    TRUE ~ "Medium"
+  ))
+```
+
+
+This will display line chart by year, that shows the average departure delay from Mon (1) to Sun (7). The red color indicates the highest average delay, while green color shows the lowest average delay.
+
+It can be seen average arrival delay consistently low in Saturday across the year. However, it should be noted that the different of average delay from Monday to Sunday are small, which under 5 minutes differences.
+
+```{r}
+ggplot(delays_per_day_1, aes(x= DayOfWeek, y = Avg_delay, group=Year, colour = colour_2))+
+  geom_line(colour= "black")+
+  geom_point()+
+  scale_color_manual(values= c("High Delay" ="darkred", "Low Delay"="darkgreen", "Medium"="darkgrey"))+ #highlight the highest and lowest avg delay
+  scale_x_continuous(breaks = 1:7)+ #to let x axis shows from 1 to 7
+  facet_wrap(~Year)+ #plot it by year
+  labs(title="Average Arr Delay by Day of Week in 2000-2004", x= "Day of Week", y= "Average Arr Delay", subtitle= "Arrival delay is defined as Arrdelay more than 15 minutes and the Depdelay is atmost 15 min, to avoid double counting from the previous analysis", colour = "Delay")+
+  theme_minimal()+
+  geom_label(aes(label= round(Avg_delay,1)), size= 2.5, vjust= -0.5, show.legend = FALSE)+ #show the label of average delay with one decimal point
+  ylim(c(25,35))+
+  theme(plot.subtitle = element_text(size= 6)) #change the size of subtitle
+
+```
+
+1. ratio_delay_dof_arrs use datas dataframe and show the flight that is not cancelled and not diverted. Then it will create a new column call Total_Arr_Delay which contains binary number, 1 represents the departure delay is more or equals to 15, otherwise 0. (If the arrival delay is equal or more than 15 and departure delay less than 15 minutes, then it will denoted as 1, otherwise it will  be 0. This mean the ratio of delay here will only account for the arrival delay that is not caused by departure delay and avoiding double counting)
+
+2. ratio_delay_dof_arr will contains ratio_delay_dof_arrs, then it will group by Year and DayOfWeek. Here any NA's value for arrival delay will be removed, as there's only one NA's value, it's unlikely will affect the results. Then, the total number of delay (Delay_flight), total number of delayed flight (Total_flight) will be calculated. It then creates a new column call Ratio_of_delay, which calculate the ratio of delay (total of delayed flight/ total flight) which is rounded into 1 decimal point and it's in percentage form.
+
+3. It will use ratio_delay_dof_arr and then create a new variable called "colour_1" where the lowest ratio of delay will be written as Low Ratio. the highest ratio of arrival delays written as high ratio, otherwise it will write as medium ratio. (for visualisation purpose).
+
+```{r}
+#1
+ratio_delay_dof_arrs <- datas%>%
+  select(Diverted,ArrDelay, DepDelay, DayOfWeek, Cancelled, Year, CRSDepTime)%>%#select only certain columns instead of all columns, the reason why cRSDepTime is included is because this ratio_delay_dof_arrs variable will be reused in subsequent part to find the best times of day later
+  filter(Cancelled ==0 &Diverted ==0)%>%
+  mutate(Total_Arr_Delay = ifelse(ArrDelay >= 15 & DepDelay <15, 1,0))
+
+#2
+ratio_delay_dof_arr <- ratio_delay_dof_arrs%>%
+  filter(!is.na(Total_Arr_Delay))%>%
+  group_by(Year, DayOfWeek)%>%
+  summarise(Delay_flight = sum(Total_Arr_Delay),
+            Total_flight = n())%>%
+  mutate(Ratio_of_delay =  round(Delay_flight/Total_flight *100,1))
+
+#3
+ratio_delay_dof_arr<- ratio_delay_dof_arr %>%
+  mutate(colour_1 = case_when (
+    Ratio_of_delay == min(Ratio_of_delay) ~"Low Ratio" ,
+    Ratio_of_delay == max (Ratio_of_delay) ~ "High Ratio" ,
+    TRUE ~ "Medium Ratio"
+  ))
+```
+
+This will visualise the ratio of arrival delay in each day, by year. It will highlight the highest and lowest ratio with red and green colour respectively. It will show label near the bar chart only if it's the highest or the lowest ratio.
+
+Frequency of delay isn't a good measure. High frequency of delays just shows that delay is happen frequently on that day, which ignores the total number of flights. High frequency of delay might occur due to high number of flights and vice versa. Therefore, ratio must be calculated and be shown.
+
+
+In Saturday, the ratio is the lowest across year. While the highest ratio happens in Thursday and Friday. However it should be considered that the ratio percentage difference between the highest and lowest ratio are small, which is under 3 percent.
+
+
+```{r}
+##
+ggplot(ratio_delay_dof_arr, aes(x= DayOfWeek,y = Ratio_of_delay, fill= colour_1))+
+  geom_bar(stat='identity')+
+  facet_wrap(~Year)+
+  labs(title= "Arr Delay Ratio (%) by Day of Week in 2000-2004", subtitle= "Delay ratio is calculated from total delayed flight / total flight times 100", x = "Day of Week", y="Arr Delay Ratio")+
+  scale_fill_manual(values= c( "Low Ratio" ="darkgreen", "High Ratio"= "darkred", "Low Ratio"= "gray" ), name= "Ratio")+
+  geom_text(aes(label= ifelse(colour_1 == "Low Ratio" | colour_1 == "High Ratio", paste(Ratio_of_delay,"%"),"")), size= 2.5, vjust= -.6)+
+  theme_minimal()+
+  ylim (c(0,12))+
+  theme(plot.subtitle = element_text(size =6))
+
+
+```
+Based on the viz above, it can be seen that Saturday always consistently low in average of delay (both departure and arrival delay). Tuesday and Saturday is the lowest average departure delay in 2000. In 2001, Tuesday have the lowest average of departure delay. But, it should be noted, the differences of severity in Saturday and Tuesday are less than 1 minutes in 2001. However, in 2003, the departure delay is the highest in Tuesday, around 6 minutes higher than Saturday. While the other graph including arrival delay have Saturday as the lowest delay. 
+
+In Saturday, departure delay seems happen more frequently than Tuesday (2000 and 2001), with 2 to 3 percent differences in ratio. However, for arrival delay, the ratio is the lowest in Saturday across the years, while Tuesday have around 1-2 % higher ratio of arrival delay than in Saturday for 5 consecutive years. Given the consistent performance from arrival delay and departure delay, Saturday is concluded as the best day of week to minimise delay. Especially 9 out ot 10 graph shows Saturday have the lowest average delay. In addition, 7 out of 10 indicates Saturday have the lowest ratio of delay (both for departure and arrival). 
+
+Saturday ratio is much lower than Friday. The highest differences between Friday and Saturday ratio reaches 8%. In Friday, the ratio of departure delay is the highest across 5 years. Even though the average delay is not the highest in Friday for all years, delay happens more frequent than other days.  
+
+To conclude, Friday have the highest ratio of delay, which mean delays happen frequently while it won't be a long delay. Saturday have the lowest ratio of delay which mean delays happen rarely, with a low minutes.
+
+
+### Previous answer is answering Part 2 a on the best days of week
+### To answer part 2 a on best times of the day:
+
+To answer which is the best time question, it will select several columns needed, and filter out the cancelled & diverted flight. As the DepTime is in int, then it will be converted into several category, where each category contains 4 hours. There will be 6 category created that represents 24 hours
+
+```{r}
+besttime <- datas%>%
+  select(Year,Diverted, CRSDepTime,ArrDelay, DepDelay, Cancelled, DayOfWeek)%>%#select some columns only
+  filter(Cancelled == 0& Diverted ==0)%>%
+  mutate(Time = case_when(
+    CRSDepTime >= 0 & CRSDepTime <400 ~"0-4", #this contains when CRSDeptime between 0 to 400 which mean it's from 00:00 to 04:00
+    CRSDepTime > 400 & CRSDepTime <=800 ~"4-8",#this contains when CRSDeptime more than 400 to 800 which mean it's from after 04:00 to 08:00
+    CRSDepTime > 800 & CRSDepTime <=1200 ~"8-12", #this contains when CRSDeptime more than 800 to 1200 which mean it's from after 08:00 to 12:00
+    CRSDepTime > 1200 & CRSDepTime <=1600 ~"12-16",#this contains when CRSDeptime more than 1200 to 1600 which mean it's from after 12:00 to 16:00
+    CRSDepTime > 1600 & CRSDepTime <=2000 ~"16-20",#this contains when CRSDeptime more than 1600 to 2000 which mean it's from after 16:00 to 20:00
+    CRSDepTime > 2000 & CRSDepTime <=2400 ~"20-24"#this contains when CRSDeptime more than 2000 to 2400 which mean it's from after 20:00 to 24:00
+  ))
+head(besttime) #show the top 5 rows
+```
+
+"arrival_del" is using besttime dataframe and contains only arrival delay which is not caused by DepDelay. 
+
+```{r}
+#arrival delay is defined as the arrival delay is more than fifteen minutes while it is not caused by departure delay
+arrival_del <- besttime%>%
+  filter(ArrDelay>= 15 & !(DepDelay >=15)) 
+summary(arrival_del)#there's no NA's values, since the filter have been applied
+
+```
+
+1. The data will be grouped based on Year, Time, and DayOfWeek and calculate the total arrival delay, average arrival delay, and frequency of arrival delay. 
+2. Then it will show boxplot by time category with the average arrival delay. It's shown by year.
+3. It seems when 00:00 to 04:00 average delay is the lowest across the year.
+
+```{r, warning=FALSE}
+#1
+timing_1 <- arrival_del%>%
+  group_by(Year,Time, DayOfWeek)%>%
+  summarise(Total_delay = sum(ArrDelay),
+            Avg_delay= mean(ArrDelay),
+            Count_delay= n())
+
+#2
+ggplot(timing_1, aes(x= Time,y= Avg_delay, fill = factor(Year)))+
+  geom_boxplot()+
+  facet_wrap(~Year)+
+  theme_minimal()+
+  labs(title="Best time of day in 2000-2004", subtitle= "Arrival Delay", fill= "Year", y ="Average Arrival Delay")
+
+
+```
+
+As low arrival delay doesn't mean it's good enough, the fact we need to see on the ratio of arrival delay, to see the likelihood of delay happening. In addition, frequency is not a good measure to calculate how bad the delay is (have been explained above).
+
+arr_ratio_time will used the ratio_delay_dof_arrs data (previously created), that filter out one NA value on Total_Arr_Delay (only one NA), which is unlikely to impact on the overall result. Then it will categorise the scheduled departure time into 6 categories. Then it will be grouped by year, day of week, and time category with summarise value to calculate the ratio of delay. The calculation is the same as before (delayed flight /total flight, in a percentage format, with one decimal point).
+```{r}
+
+arr_ratio_time<- ratio_delay_dof_arrs%>%
+  filter(!is.na(Total_Arr_Delay))%>%
+  mutate(Time = case_when(
+    CRSDepTime >= 0 & CRSDepTime <=400 ~"0-4",
+    CRSDepTime > 400 & CRSDepTime <=800 ~"4-8",
+    CRSDepTime > 800 & CRSDepTime <=1200 ~"8-12",
+    CRSDepTime > 1200 & CRSDepTime <=1600 ~"12-16",
+    CRSDepTime > 1600 & CRSDepTime <=2000 ~"16-20",
+    CRSDepTime > 2000 & CRSDepTime <=2400 ~"20-24"
+    ))%>%
+  group_by(Year, DayOfWeek,Time)%>%
+  summarise(Delay_flight = sum(Total_Arr_Delay),
+            Total_flight = n())%>%
+  mutate(Ratio_of_delay =  round(Delay_flight/Total_flight *100,1))
+
+arr_ratio_time
+```
+
+
+1. The ratio of delay is displayed by heatmap in each year from 2000 to 2004. It will shows the ratio of delay based on day of week from Mon to Sun and Time category. When the ratio of delay is low, it will be light green, and if it's high ratio it will be in dark green. 
+
+2. The ratio of delay seems to be lower in Saturday across all time categories. Then when it's at 12-16 and 16-20 time category, the ratio of delay seems higher. 
+3. Here the ratio of delay is quite similar across the day which is not much different between it. The ratio of arrival delay (all is under 8%) is low. Instead of looking in this minor different, further analysis must be done, especially looking into the departure delay ratio. 
+
+```{r}
+#both time and day of week
+ggplot(arr_ratio_time, aes(x = DayOfWeek, y = Time, fill = Ratio_of_delay)) +
+  geom_tile()+
+  scale_fill_continuous(low="lightgreen", high="darkgreen")+
+  labs(title= "Best Times and Day of the Week in 2000-2004", fill= "Delay Ratio", subtitle= "Ratio of Arrival Delay (%)")+
+  theme_minimal()+
+  facet_wrap(~Year)
+
+
+```
+
+
+"dpeart_del" is using besttime dataframe (previously created) and contains only departure delay (DepDelay >=15). Since it's based on definition provided by OAG.
+
+```{r}
+depart_del <- besttime%>%
+  filter(DepDelay >=15) 
+```
+
+This steps will repeat on the arrival delay that have been done before. The only difference is only on the data used, where here we use departure delay (depart_del).
+
+The data will be grouped based on Year, Time, and DayOfWeek and calculate the total arrival delay, average arrival delay, and frequency of arrival delay. 
+
+
+```{r}
+timing_3 <- depart_del%>%
+  group_by(Year,Time, DayOfWeek)%>%
+  summarise(Total_delay = sum(DepDelay),
+            Avg_delay= mean(DepDelay),
+            Count_delay= n())
+
+```
+
+1. It will show boxplot by time category with the average arrival delay. It's shown by year.
+2. It seems when 00:00 to 04:00 average delay is the lowest in 2002, 2003, and 2004 but it's the highest in the other year. The variation within this time category is quite high. This time category have left skewed in 2000 and 2001, while the other years it's right skewed. 
+3. At 8-12 which is 08:00 to 12:00 it's not the always the lowest in all 5 years, but the variation within this time category is small, meaning that the delay will be around that time all the time and it won't be too long of waiting delay or too quick since it's low variation that reinforces the argument that it's less outliers.
+
+```{r}
+ggplot(timing_3, aes(x= Time,y= Avg_delay, fill = factor(Year)))+
+  geom_boxplot()+
+  facet_wrap(~Year)+
+  theme_minimal()+
+  labs(title="Best Time of Day in 2000-2004", subtitle= "Departure Delay", fill= "Year", y= "Average Departure Delay")
+
+
+```
+
+This process will repeating the arrival delay steps, where ratio of delay being calculated and visualise it using heatmap.
+
+As low departure delay doesn't mean it's good enough, the fact we need to see on the ratio of departure delay, to see the likelihood of delay happening. In addition, frequency is not a good measure to calculate how bad the delay is (have been explained above).
+
+dep_ratio_time will used the ratio_delay_dofs data.It will create Time, which is a time category. It will grouped the 24 hours into 6 categories. Then it will categorise the scheduled departure time into 6 categories. Then it will be grouped by year, day of week, and time category with summarise value to calculate the ratio of delay. The calculation is the same as before (delayed flight /total flight, in a percentage format, with one decimal point).
+
+
+```{r}
+dep_ratio_time <- ratio_delay_dofs%>%
+  mutate(Time = case_when(
+    CRSDepTime >= 0 & CRSDepTime <=400 ~"0-4",#00:00 to 04:00
+    CRSDepTime > 400 & CRSDepTime <=800 ~"4-8",
+    CRSDepTime > 800 & CRSDepTime <=1200 ~"8-12",
+    CRSDepTime > 1200 & CRSDepTime <=1600 ~"12-16",
+    CRSDepTime > 1600 & CRSDepTime <=2000 ~"16-20",
+    CRSDepTime > 2000 & CRSDepTime <=2400 ~"20-24"
+  ))%>%
+  group_by(Year, DayOfWeek, Time)%>%
+  summarise(Delay_flight = sum(Total_Arr_Delay), #it's actualy 1 or 0 inside the Total_Arr_delay
+            Total_flight = n())%>%#total row of it,
+  mutate(Ratio_of_delay =  round(Delay_flight/Total_flight *100,1))#can count the proportion of delay
+```
+
+1. The ratio of departure delay is displayed by heatmap in each year from 2000 to 2004. It will shows the ratio of delay based on day of week from Mon to Sun and Time category. When the ratio of delay is low, it will be light green, and if it's high ratio it will be in dark green. 
+
+2. Here the ratio of delay is quite high and the difference is much more than in arrival delay. The ratio of arrival delay is vary from 0 to 30%. It shows that at 4:00 to 8:00 the departure delay ratio the lowest across day of week and year. While in Saturday, the ratio of delay is low across all time category, that reinforces that Saturday might the best day to avoid delay.
+
+3. While 16:00 to 20:00 might be the worst time since it have high average delay as well as high ratio delay. 
+
+
+```{r}
+ggplot(dep_ratio_time, aes(x = DayOfWeek, y = Time, fill = Ratio_of_delay)) +
+  geom_tile()+
+  facet_wrap(~Year)+
+  scale_fill_continuous(low="lightgreen", high="darkgreen")+
+  labs(title= "Best Times and Day of the Week in 2000-2004", fill= "Delay Ratio", subtitle= "Ratio of Departure Delay",x ="Time Category", y= "Day of Week")+
+  theme_minimal()
+
+```
+1. We can see the 4-8 is the lowest ratio of departure delay. 0-4 category seems to have quite low ratio of delay. However compared to the 4-8 category, the colour of it, is much more lighter. This indicates there will be some differences between ratio, and this could be a bit higher. We can see the ratio here is unlike the arrival delay that have minor differences. Here there's huge variation of delay from under 0 to 30% or even more. 
+
+When we compare this with the boxplot of departure delay, in 2000-2001 the 4-8 indeed have lower average delay. However this trends have been changed and it become the highest since 2002. The average delay might have like 15 minutes differences between 0-4 with 4-8 in 2002 onwards. 
+
+While in arrival delay, the ratio of delay is quite similar, with minor differences. The average arrival delay (boxplot) shows that 4-8 indeed have higher average delay than 0-4. But it should be considered that the difference of avg delay is small. Therefore, 0-4 indeed have shorter delay than 4-8 but the delays happen more frequently. While 4-8 may have a bit longer delay than 0-4, but the ratio of delay is much smaller than it. Therefore, 4-8 is more recommended than 0-4.
+
+Passengers must avoid 16-20 as it is always the top two highest average delay, while from the heatmap it always in darker colour in both departure and arrival delay.
+
+### To answer 2 b
+
+To answer part b qn, we need plane-data csv. then it will be stored in plane_age variable. Then to standardised the column name, we create a new column call TailNum that will be joined with the datas. It will stored in age_flight by left join the datas data frame with the plane_age. It will filter only the non-cancelled, non-diverted, with arrival delay or departure delay more than 15 .
+
+
+
+It will read the plane-data.csv and stored it in plane_age
+
+```{r}
+plane_age <- read.csv("plane-data.csv")
+```
+
+
+Then TailNum column will be created which contain tailnum
+```{r}
+plane_age <- plane_age%>%
+  mutate(TailNum = tailnum)
+```
+
+
+the "datas" will be used with selected columns. While it will include only the flight with delay. Then it will be joined (left_join) with plane_age data on TailNum.
+
+```{r}
+age_flight <- datas%>%
+  select(Diverted, Year, CRSDepTime,ArrDelay, DepDelay, CRSDepTime, Cancelled, TailNum)%>%
+  filter(Cancelled ==0 &Diverted ==0 & (ArrDelay >=15 | DepDelay >=15))%>% #filter the data where it is not cancelled and not diverted, with the arrival delay is equals or more than 15 or departure delay is equals or more than 15 minutes.
+  left_join(plane_age)
+```
+
+This will replace the year column, with new "year" column. When the original year is "None" or 0 then it will converted into NA. As year is None mean it's NA. while the year 0, is unlikely so. As here year represents the manufacturer year, it can't be 0.
+
+```{r}
+age_fli <- age_flight%>%
+  mutate(year = ifelse (year== "None", NA, year),
+         year= ifelse(as.integer(year) == 0, NA, year))
+#convert the year when it is None or 0 into NA since it's impossible to be 0 for year of manufacturer
+
+```
+
+This will convert the year into integer, not date format. Then It will create "age" column by calculating the difference of flight year with manufactured year.
+
+When the manufacture year is more than the flight year, mean there's problem in data. It's impossible to have flight year example, in 2000, but the flight manufactured in 2003. 
+
+Here the Na's value will be here, as it will be used in later purpose
+
+```{r}
+og <- age_fli %>%
+  mutate(year= as.integer(year),
+         age = Year- year)%>%
+  filter(year <= Year | is.na(year))#when Year (flight year) is less or equals to the manufacturer year (year) or when the year(manufactuer) is NA's
+```
+
+There's huge amount of NA. When it's excluded from analysis, the conclusion must be seen with cautious. 
+```{r}
+summary(og)
+
+#Na's 3990249 rows
+```
+
+
+```{r}
+nrow(og)         
+#out of 6639986,  have 3990249 NA's value
+```
+
+It's only when departure delay happened (more than 15 minutes delay). We will create category of age, which is useful for visualisation purpose.
+```{r}
+
+depdelays <- og%>%
+  filter(DepDelay>=15)%>% #departure delay when it is more or equals to 15 minutes
+  mutate(Age_category = case_when(
+    age >= 0 & age <=10 ~"0-10", #when the age is 0 to 10it's denoted as 0-10
+    age >= 11 & age <=20 ~"11-20",#when the age is 11 to 20 it's denoted as 11-20
+    age >= 21 & age <=30 ~"21-30",#when the age is 21 to 30 it's denoted as 21-30
+    age >= 31 & age <=40 ~"31-40",#when the age is 31 to 40 it's denoted as 31-40
+    age >= 41 & age <=50 ~"41-50",#when the age is 41 to 50 it's denoted as 41-50
+    age == NA ~ "NA"#when the age NA it's denoted as "NA"
+    
+  ))
+
+```
+
+It will group the data based on year, age, and the age category created before. We will plot the average departure delay based on the age in scatter plot. The colour will represents the age category. When age is lower, it will be in green, otherwise it will be in red (older plane). The regression line will be shown. 
+
+Here the relationship between age of plane and delay are weak across the year.
+```{r}
+age_dep_delay<- depdelays %>%
+  group_by(Year,age, Age_category)%>%
+  summarise(DepDelay= mean(DepDelay),
+            Num_of_delay = n())
+```
+
+It shows the bottom 5 rows
+
+```{r}
+tail(age_dep_delay)
+```
+To see how many flights in each Year by each Age_category when the flight is delayed on departure. The depdelays data will be used, then pipe to next line which is group that data by Year then Age_category while n() will count it. 
+
+It seems NA's values are quite high in all 5 years, especially in 2001.
+```{r}
+depdelays%>%
+  group_by(Year,Age_category)%>%
+  summarise(Freq = n())
+```
+
+
+It will show the scatter plot with linear model (linear regression line) then the color will be adjusted by age category. Then it won't show the stadard error. It will plot by year. It seems the relationship between age and departure delay is quite weak. However in 2001, the data seems much little than other years, it reinforces previous analysis where the NA's values belongs more to 2001 data.
+
+```{r, warning=FALSE}
+#we plot by removing NA
+ggplot(age_dep_delay, aes(x= age, y = DepDelay, colour=Age_category))+
+  geom_point()+
+  geom_smooth(method= "lm", se= FALSE, colour= "darkblue")+
+  scale_colour_manual(values= c("0-10" = "#2E8B57","11-20" = "#66A07A","21-30" = "#A0B963","31-40" = "#D4A354","41-50" = "#E57346"))+
+  labs(title= "Relationship of Plane Age with Dep Delay", subtitle= "Dep delay is defined when Depdelay >=15", x= "Age of Plane", y= "Departure Delay", colour= "Age Category")+
+  facet_wrap(~ Year)+
+  theme(plot.subtitle = element_text(size= 7))+
+  theme_minimal()
+
+```
+
+
+```{r}
+#ratio of delays will be calculated, the process is the same as previously. 
+ratio_delay <- datas%>%
+  select(Cancelled, Diverted, DepDelay, Year, TailNum)%>%
+  filter(Cancelled ==0 & Diverted ==0)%>%
+  mutate(Total_flight_delayed = ifelse(DepDelay>=15, 1, 0))
+
+# the delay ratio will be combined with the plane age, while the "None" and 0 year will be converted to NA. The process will repeating the process that have been done before. 
+
+delay_ratio <- ratio_delay%>%
+  left_join(plane_age)%>%#the ratio_delay will be joined with plane_age on TailNum, by left join
+  mutate(year = ifelse(year == "None", NA, year),#it's the same as steps that have been done before, to convert None into NA
+         year= ifelse(year== 0, NA, year),#convert 0 to NA
+         year= as.integer(year),
+         age = Year- year)%>%#calculate age by flight of Year minus the manufactured year
+  filter(year <= Year | is.na(year))#filter the year which is less than equals to Year and include the Na's values on year
+```
+
+
+```{r}
+#create the age category, for the visualisation purpose
+delays_ratio <- delay_ratio%>%
+  mutate(Age_category = case_when(
+    age >= 0 & age <=10 ~"0-10",# it's the same as previous step, where the age is 0 to 10
+    age >= 11 & age <=20 ~"11-20", # when age is 11 to 20
+    age >= 21 & age <=30 ~"21-30",# when age is 21 to 30
+    age >= 31 & age <=40 ~"31-40",# when age is 31 to 40
+    age >= 41 & age <=50 ~"41-50",# when age is 41 to 50
+    age == NA ~ "NA"))# when age NA
+```
+
+It will group the delays_ratio by Year and Age_category which calclated the frequency of flight (total_flight) and total_delay_flight which is the total delayed flight. These will be used to calculate ratio of delay. The ratio_of_delay is by dividing total_delay_flight with total_flight then times 100 and round it one decimal point.
+```{r}
+delaying_ratio <-delays_ratio%>%
+  group_by(Year, Age_category)%>%
+  summarise(total_flight = n(),
+            total_delay_flight = sum(Total_flight_delayed))%>%
+  mutate (ratio_of_delay = round(total_delay_flight / total_flight *100,1))
+
+head(delaying_ratio) #it shows the top 5 rows
+```
+
+1. It will use the depdelays data and group it by Year and Age category, where the average departure delay and frequency of delay will be caculated.
+2. join_ratio_delay will use the age_dep_delay_1 data and join it with delaying_ratio. It also create column call colours_ that will be used for visualisation purpose, high ratio in red, low ratio in green
+
+```{r}
+#1
+age_dep_delay_1<- depdelays %>%
+  group_by(Year, Age_category)%>%
+  summarise(DepDelay= mean(DepDelay),
+            Num_of_delay = n())
+
+#2
+join_ratio_delay<-age_dep_delay_1%>%
+  left_join(delaying_ratio)%>%
+  mutate(colours_ = case_when(
+    ratio_of_delay == min(ratio_of_delay) ~"Low Ratio",
+    ratio_of_delay == max(ratio_of_delay) ~"High Ratio",
+    TRUE ~ "Medium"
+  ))
+
+head(join_ratio_delay) #show the top 5 rows
+
+```
+
+The bar plot will be shown, where high ratio will be shown as red and low ratio is shown as green. 
+
+```{r}
+ggplot(join_ratio_delay, aes(x= Age_category, y= ratio_of_delay, fill=colours_))+
+  geom_bar(stat='identity')+
+  labs(title= "Ratio of Dep Delay by Plane Age Category", x="Age Category", y="Ratio of Dep Delay")+
+  facet_wrap(~Year)+
+  scale_fill_manual(values = c("High Ratio"= "darkred", "Low Ratio"= "darkgreen", "Medium" ="darkgrey"))+
+  theme_minimal()
+
+
+```
+
+The NA's values have the highest ratio delays across 5 years, while 31-40 have the lowest ratio of delay in 2000 to 2004 except 2002. The lowest ratio of delay in 2002 is at 0-10 age category. This conclusion must be view with care since it's include high NA's values. As here the NA's value have high ratio, while the age category is unknown
+
+
+
+The arrival delay wil be calculated using the previous steps. It will repeat the process in departure delay with this arrival delay data.
+
+the og data will be used, and filter it by arrival delay is more or equals to 15 minutes and the departure delay less than 15 minutes which mean the delay is only caused by arrival delay. 
+```{r}
+###arrival
+
+arrdelays <- og%>%
+  filter(DepDelay<15 & ArrDelay>=15)%>%
+  mutate(Age_category = case_when(
+    age >= 0 & age <=10 ~"0-10",#age is within 0 to 10
+    age >= 11 & age <=20 ~"11-20",
+    age >= 21 & age <=30 ~"21-30",
+    age >= 31 & age <=40 ~"31-40",
+    age >= 41 & age <=50 ~"41-50",
+    age == NA ~"NA"#all NA's value is included in "NA" category
+  ))
+
+
+summary(arrdelays)#there's 988375 NA's
+```
+
+The data is grouped by Year, age, and Age_category, where arrival delay and frequency of delay will be calculated. The average of delay will be count as well of frequency delay. 
+
+```{r}
+age_arr_delay<- arrdelays %>%
+  group_by(Year,age, Age_category)%>%
+  summarise(ArrDelay= mean(ArrDelay),
+            Num_of_delay = n())
+
+tail(age_arr_delay)#bottom 5 rows will be shown
+
+
+```
+
+The Na's values is count here, since it calculated by number of Age_category by each year. In 2001 the NA's values are the highest.
+
+```{r}
+arrdelays%>%
+  group_by(Year,Age_category)%>%
+  summarise(Freq = n())
+```
+
+
+We will plot it in scatter plot and removing the NA. The intepretation must be seen with cautios. It seems the relationship between arrival delay with age is not strong.
+
+```{r, warning=FALSE}
+ggplot(age_arr_delay, aes(x= age, y = ArrDelay, colour=Age_category))+
+  geom_point()+
+  geom_smooth(method= "lm", se= FALSE, colour= "darkblue")+#the standard error won't be shown here since it set to be false, it also shows the linear regression
+  scale_colour_manual(values= c("0-10" = "#2E8B57","11-20" = "#66A07A","21-30" = "#A0B963","31-40" = "#D4A354","41-50" = "#E57346"))+
+  labs(title= "Relationship of Plane Age with Arr Delay",x= "Age of Plane", y= "Arrival Delay", colour= "Age Category")+
+  facet_wrap(~ Year)+ #plot it by year
+  theme(plot.subtitle = element_text(size= 7))+
+  theme_minimal()
+
+
+```
+
+The process is just repeating the previous process.
+It will filter out the cancelled and diverted flight. It will created a new column call Total_flight_delayed, when the departure delay is less than 15, and arrival delay is equals or greater than 15, it will return as 1, otherwise 0. It will removed out the NA's value.
+
+```{r}
+ratio_delay_arr <- datas%>%
+  select(Cancelled, Diverted, ArrDelay, DepDelay, CRSDepTime, TailNum, Year)%>%
+  filter(Cancelled ==0 & Diverted ==0)%>%#when the data is not cancelled and not diverted
+  mutate(Total_flight_delayed = ifelse(DepDelay<15 & ArrDelay>=15, 1, 0))%>%
+  filter(! is.na(Total_flight_delayed))
+```
+
+It will left join the ratio_delay_arr with plane_age. It repeated previous process. The year which is None and 0 will be converted to NA. age will be calculated by Year less year. year is the manufactured year of plane, while Year is the flight year. 
+
+It will remove out the unlogical data, such as manufactured year is after the flight year. Then it will calculate the ratio of delay.
+
+```{r}
+ratio_delay_arr <- ratio_delay_arr%>%
+  left_join(plane_age)%>% #combine it with plane_age
+  mutate(year = ifelse(year == "None", NA, year),#if year is None make it NA, otherwise year
+         year= ifelse(year== 0, NA, year),#if year is 0 make it NA, otherwise year
+         year= as.integer(year),
+         age = Year- year)%>% #the age calculated is when flight Year minus the manufactured year
+  filter(year <= Year | is.na(year))%>% #here na is still included and will be used for the later part
+  mutate(Age_category = case_when(
+    age >= 0 & age <=10 ~"0-10",
+    age >= 11 & age <=20 ~"11-20",
+    age >= 21 & age <=30 ~"21-30",# the age is grouped which is the same as the previous step
+    age >= 31 & age <=40 ~"31-40",
+    age >= 41 & age <=50 ~"41-50",
+    age == NA ~ "NA"))%>%
+  group_by(Year, Age_category)%>%#group by Year and Age category
+  summarise(total_flight = n(),
+            total_delay_flight = sum(Total_flight_delayed))%>%
+  mutate (ratio_of_delay = round(total_delay_flight / total_flight *100,1))#calculate the ratio of delay and stored it as 1 decimal point
+
+head(ratio_delay_arr)#show the top 5 rows
+```
+
+The arrdelays data will be used and grouped by Year and Age_category, where the average arrival delay and frequency of arrival delay will be calculated.
+
+```{r}
+age_arr_delay_1<- arrdelays %>%
+  group_by(Year, Age_category)%>%
+  summarise(ArrDelay= mean(ArrDelay),#average of delay
+            Num_of_delay = n())#frequency
+
+head(age_arr_delay_1)#it shows the top 5 rows
+```
+
+The age_arr_delay_1 will be joined with ratio_delay_arr (left), then it will create a new column call colours_ which is used in visualisation purpose. If the ratio_of_delay is the minimum it will denoted as Low Ratio, if it is the maximum, it will denoted as High Ratio, otherwise it's denoted as Medium
+
+```{r}
+join_ratio_delay_arr<-age_arr_delay_1%>%
+  left_join(ratio_delay_arr)%>%
+  mutate(colours_ = case_when(
+    ratio_of_delay == min(ratio_of_delay) ~"Low Ratio",
+    ratio_of_delay == max(ratio_of_delay) ~"High Ratio",
+    TRUE ~ "Medium"
+  ))
+
+head(join_ratio_delay_arr)#show the top 5 rows
+```
+
+It will show the bar plot between age category and ratio of delay. When the ratio of delay is high it will be in red, if it is the lowest ratio delay, it will be in green. It will be shown by year. The NA's values is included here, even though it's seperately from each year. 
+```{r}
+ggplot(join_ratio_delay_arr, aes(x= Age_category, y= ratio_of_delay, fill=colours_))+
+  geom_bar(stat='identity')+
+  labs(title= "Ratio of Arr Delay by Plane Age Category", x="Age Category", y="Arr Delay Ratio")+
+  facet_wrap(~Year)+
+  scale_fill_manual(values = c("High Ratio"= "darkred", "Low Ratio"= "darkgreen", "Medium" ="darkgrey"))+
+  theme_minimal()
+
+```
+
+For arrival delay the Na's values seem to be low across all years except 2000, where 21-30 is the lowest. As here the ratio of delay seems low, then conclusion must be compared with departure delay ratio. Since the NA's values having low ratio of delay, it's possible to assume to ignore NA's and draw a conclusion, as the NA's values provide less impact on overall analysis. Given that conditions, then the relationship between *age* and *Ratio of delay* is weak. In 2002 and 2003, instead of upward sloping, it's downward, means the higher the age, the lower the ratio of delay, which is an evidence to state older age is not causing higher delay. 
+
+
+```{r}
+cor(arrdelays$ArrDelay, arrdelays$age, use= "complete.obs")
+```
+```{r}
+cor(depdelays$DepDelay, depdelays$age, use= "complete.obs")
+```
+
+It shows there's no relationship between age of plane with the departure delay or arrival delay. The arrival delay even have slightly negative relationship. Since it's close to 0.00, it can be concluded there's no relationship between age of plane with the delay. Then the older the plane doesn't mean it suffers more delay.
+
+###To answer part c
+
+The data will contains non-cancelled flight. we choose some columns that might be useful for feature selection in later part. Here the Diverted column will be replaced with factor original diverted columns, with level of 0 and 1.
+```{r}
+US_Diverted_flight <- datas%>%
+  filter(Cancelled==0)%>%
+  select(Diverted,Year, Month, DayofMonth,DayOfWeek, CRSDepTime, CRSArrTime, Distance, DepTime, Origin, Dest, UniqueCarrier, FlightNum, DepDelay)%>%
+  mutate(Diverted= as.factor(Diverted))
+
+```
+
+Here the no NA's values on US_Diverted_flight
+```{r}
+sum(is.na(US_Diverted_flight))
+```
+
+
+We will fit the data with the model (logistic regression) by each year.
+
+First we will use the data in 2000. We will convert the categorical data such as day of week, day of month, and unique carrier into factor. This will be useful for logistic regression model in later part, since it was categorical data. For crs arr time and crs dep time, it will converted to numeric (it's treated as continuos rather than categorical).
+
+```{r}
+YEAR_2000 <- US_Diverted_flight%>%
+  select(UniqueCarrier,Year, Diverted, CRSDepTime, Distance, CRSArrTime, DayofMonth, DayOfWeek)%>%
+  filter(Year== 2000)%>%
+  mutate(Diverted = as.factor(Diverted),#treat diverted as factor
+         CRSDepTime  = as.numeric(CRSDepTime),#continue to treat is as numeric
+         CRSArrTime = as.numeric(CRSArrTime),#numeric
+         UniqueCarrier = as.factor(UniqueCarrier),#factor or categorical
+         DayOfWeek = as.factor(DayOfWeek),#factor or categorical
+         DayofMonth = as.factor(DayofMonth))#factor or categorical
+
+  
+```
+
+
+Here US_Diverted_flight will be used when the Year is 2000, and we select certain columns , and convert back the Diverted to numeric,  so it can be used for correlation checks using spearman as there might be monotonic or non linear relationship with rank.
+```{r}
+numer <- US_Diverted_flight%>%
+  filter(Year == 2000)%>%
+  select(Diverted, Month, DayofMonth, DayOfWeek, CRSDepTime,CRSArrTime,Distance,DepTime, DepDelay)%>%
+  mutate(Diverted = as.numeric(Diverted))
+
+matrix_correl <- cor(numer, method= "spearman")
+```
+
+Plot the correlation matrix and show the number, will color from "spectral" with 5 different color, and set the title call Correlation of Variables with size 0.6, then the axis on x is plot with 45 angle so that the title is not covered
+
+```{r}
+corrplot(matrix_correl, method="number", col=brewer.pal(n=5,name="Spectral"), number.cex= 0.6, title= "Correlation of Variables", tl.cex= 0.5, tl.srt=45)
+```
+
+
+This will split the data from YEAR_2000 into 50% of training data and 50% testing data. The 50% is selected due to the big dataset. The index vector which is row number will be returned since it's set to be FALSE.
+
+Then the data_train_1_2000 will contains the data frame with rows that is indicated in data_training_2000 (row number) and the data itself is from YEAR_2000. This will be used to training data.
+
+The data_test_1_2000 is the data from YEAR_2000 that is not in data_train_2000. It will become the test data, for the model testing purpose.
+
+```{r, warning= FALSE}
+data_training_2000 <- createDataPartition(YEAR_2000$Diverted, p = 0.5, list = FALSE)
+
+data_train_1_2000 <- YEAR_2000%>%
+  slice(data_training_2000)
+data_test_1_2000 <- YEAR_2000%>%
+  slice(-data_training_2000)
+
+```
+
+The data_test_1_2000 will be used and it will be grouped by Diverted. Then the "Frequency" will be calulated based on the number of rows. So when the Diverted equals to 0, it will calculate the total rows that have 0 as the values of diverted.
+
+```{r}
+data_test_1_2000%>%
+  group_by(Diverted)%>%
+  summarise(Frequency = n())
+```
+
+
+This will train the model. 
+1. it will used the data from data_train_1_2000, with the name of task 'data_2000'. It used the classification task and creating a new object. Then it will targeting the Diverted(the variable we want to predict) which contains binary whether it is 0 or 1. 
+2. train_task_2000 will select only specific columns such as Distance, CRSDepTime, UniqueCarrier, DayOfWeek,CRSArrTime, and DayofMonth.
+3. Then the performance will be measured in class_error_2000, that compare the predicted probabilities with the actual true data. The lower it's the better. 
+4. Model will be created using logistic regression, where the probability will be predicted. It will be useful since the data is highly imbalanced, where threshold might need to be adjusted.
+5. This to ensure there's no missing value. In case there's missing value, then the mean of feature will be imputed in the NA's. Then it will pass into the model for training later.
+6. It will then used to build model, training the model using the feature selected, and make prediction in the future. 
+
+```{r}
+#1
+train_task_2000 <- TaskClassif$new('data_2000', backend = data_train_1_2000, target = 'Diverted')
+
+#2
+train_task_2000$select(c("Distance","CRSDepTime","UniqueCarrier","DayOfWeek" ,"DayofMonth","CRSArrTime"))
+
+#3
+class_error_2000 <- msr('classif.ce')
+
+#4
+learners <- lrn("classif.log_reg", predict_type= "prob")
+
+#5
+graph_learn <- po('imputemean') %>>% po(learners)
+
+#6
+graphs_learners <- GraphLearner$new(graph_learn)
+```
+
+This will allows the model that we have created before to perform training data using train_task_2000.
+
+```{r}
+graphs_learners$train(train_task_2000)
+```
+
+
+After the training have been done, the model will predict the test data (data_test_1_2001). Then score will be seen. As we use the classif.ce it will calculated the total error( wrong decision that model make, for example, when the Diverted is 0 it will predicted as 1 and vice versa).
+It shows that the error is around 0.00259 which is quite small. This might highly affected due to imbalance on data.
+
+```{r}
+predict_scores_2000 <- graphs_learners$predict_newdata(data_test_1_2000)#use the train model to predict the test data which is not being seen during training
+
+cls_error_2000 <- predict_scores_2000$score() 
+
+cls_error_2000
+
+# classif.ce 
+#0.002593732 
+```
+
+It will contains the coefficients of feature selected from the model that we have trained before. It will be used to answer part c question. It's stored inside the coefficient_2000, then set it into data frame into coefficients_2000, then it will create a new column call Coefficient_2000 and the values contain inside will be the rownames of that dataframe, then it will rename the column names into Coefficient and Feature_Selected respectively.
+
+```{r}
+coefficient_2000 <- graphs_learners$model$classif.log_reg$model$coefficients
+
+coefficients_2000 <- as.data.frame(coefficient_2000)
+
+coefficients_2000 <- coefficients_2000%>%
+  mutate(Coefficient_2000 = rownames(coefficients_2000))
+
+colnames(coefficients_2000) <- c("Coefficient","Feature_Selected")
+
+
+coefficients_2000 <- coefficients_2000%>%
+  mutate(Year_ = 2000) #Here, we will create a new column "Year_"that will be used in later part, for combination of coefficients across years.
+
+head(coefficients_2000) #show the top 5 rows 
+
+```
+
+This is performed so that the data frame only contains the rows that have maximum value of Coefficient_2000 and minimum value of Coefficient_2000. It has been done for visualisation purposes.
+
+```{r}
+conditions_2000 <- coefficients_2000%>%
+  filter(Coefficient == max(Coefficient)|Coefficient == min(Coefficient))
+
+head(conditions_2000)
+
+```
+The graph shows how he coefficient of each feature. It's ordered from the highest (postive coefficent) into the lowest (negative). Instead of x is Feature_selected and y is the Coefficient, coord_flip has flip the y into x axis and vice versa.Then the labels will be shown only if it's in coditions. The title of this graph is Coefficint of Logistic Regression in 2000 (Before), which mean this is all coefficient before removing p-value >0.05
+```{r}
+ggplot(coefficients_2000, aes(x= reorder(Feature_Selected, Coefficient), y= Coefficient))+
+  geom_col(fill="darkgreen")+
+  coord_flip()+
+  theme_minimal()+
+  geom_text(data=conditions_2000,aes(label = round(Coefficient,2)),size= 3, hjust= 0.9)+
+  labs(title= "Coefficient of Logistic Regression in 2000 (Before)", y= "Coefficient Value", x="Feature")
+
+```
+
+Since the model is set to have probability instead of label, then threshold is able to be adjusted. When it's > 0.005 it will be considered as 1, rather than default which is 0.5. This due to the highly imbalance data. 
+```{r}
+
+testing_data_2000 <- data_test_1_2000%>%
+  mutate(Prediction_2000 = ifelse (predict_scores_2000$prob[,2]>0.005,1,0))
+
+```
+
+This will create the confusion matrix, to see how many 0 are predicted as 1 (False Positive), how many 1 is predicted as 0 (False Negative), how many 0 is predicted as 0 (True Negative), and how many 1 is predicted as 1 (True Positive). Therefore it can calculate how many percentage of accuracy, specifiticity, and sensitivity.
+```{r}
+matrix_cons_2000 <- table(Predicted= testing_data_2000$Prediction_2000, Actual= data_test_1_2000$Diverted)
+
+print(matrix_cons_2000)
+
+#specificity => 14.13% 
+#Sensitivity = 93.7%
+
+```
+
+
+
+This is the area under the curve. The closer to 1 the better it's. The model must have atleast more than 0.5, if not, it's not even better than guessing.
+The result in the sensitivity, specificity, and auc shows the model still have a room of improvement. The fact that data is highly imbalance, between 0 and 1 make the model difficult to predict. That's also the reason why threshold is adjusted in a low value rather than 0.5. There's possibility to use smote so that the data can be more balanced.  
+```{r}
+auc <- predict_scores_2000$score(msr("classif.auc"))
+auc
+#classif.auc 
+# 0.6433284 
+```
+For further analysis, removing p value that is > 0.05 might be recommendable. In addition, the data is highly imbalance so that SMOTE can be done whether it's oversampling or undersampling.
+
+
+First we will use the data in 2001. We will convert the categorical data such as day of week, day of month, and unique carrier into factor. This will be useful for logistic regression model in later part, since it was categorical data. For CRS arr time and CRS dep time, it will converted to numeric (it's treated as continuous rather than categorical).
+
+```{r}
+YEAR_2001 <- US_Diverted_flight%>%
+  select(UniqueCarrier,Year, Diverted, CRSDepTime, Distance, CRSArrTime, DayofMonth, DayOfWeek)%>%
+  filter(Year== 2001)%>%
+  mutate(Diverted = as.factor(Diverted), #category or factor
+         CRSDepTime  = as.numeric(CRSDepTime), #numeric, continuous
+         CRSArrTime = as.numeric(CRSArrTime),
+         UniqueCarrier = as.factor(UniqueCarrier),
+         DayOfWeek = as.factor(DayOfWeek),
+         DayofMonth = as.factor(DayofMonth))
+
+  
+```
+
+
+This will split the data from YEAR_2001 into 50% of training data and 50% testing data. The 50% is selected due to the big dataset. The index vector which is row number will be returned since it's set to be FALSE.
+
+Then the data_train_1_2001 will contains the data frame with rows that is indicated in data_training_2001 (row number) and the data itself is from YEAR_2001. This will be used to training data.
+
+The data_test_1_2001 is the data from YEAR_2001 that is not in data_train_2001. It will become the test data, for the model testing purpose.
+
+```{r}
+data_training_2001 <- createDataPartition(YEAR_2001$Diverted, p = 0.5, list = FALSE)
+
+data_train_1_2001 <- YEAR_2001%>%
+  slice(data_training_2001)
+data_test_1_2001 <- YEAR_2001%>%
+  slice(-data_training_2001)
+
+```
+
+The data_test_1_2001 will be used and it will be grouped by Diverted. Then the "Frequency" will be calulated based on the number of rows. So when the Diverted equals to 0, it will calculate the total rows that have 0 as the values of diverted.
+
+```{r}
+data_test_1_2001%>%
+  group_by(Diverted)%>%
+  summarise(Frequency = n())
+```
+
+This will train the model. 
+1. it will used the data from data_train_1_2001, with the name of task 'data_2001'. It used the classification task and creating a new object. Then it will targeting the Diverted(the variable we want to predict) which contains binary whether it is 0 or 1. 
+2. train_task_2001 will select only specific columns such as Distance, CRSDepTime, UniqueCarrier, DayOfWeek, and DayofMonth.
+3. Then the performance will be measured in class_error_2001, that compare the predicted probabilities with the actual true data. The lower it's the better. 
+4. We use the learner that previously have been set, which is logistic regression model with predicted probability that could be adjusted on threshold.
+5. This to ensure there's no missing value. In case there's missing value, then the mean of feature will be imputed in the NA's. Then it will pass into the model for training later.
+
+6. It will then used to build model, training the model using the feature selected, and make prediction in the future. 
+
+```{r}
+#1
+train_task_2001 <- TaskClassif$new('data_2001', backend = data_train_1_2001, target = 'Diverted')
+
+#2
+train_task_2001$select(c("Distance","CRSDepTime","UniqueCarrier","DayOfWeek" ,"DayofMonth","CRSArrTime"))
+
+#3
+class_error_2001 <- msr('classif.ce')
+
+#5
+graph_learn_2001 <- po('imputemean') %>>% po(learners)
+
+#6
+graphs_learners_2001 <- GraphLearner$new(graph_learn_2001)
+```
+This will allows the model that we have created before to perform training data using train_task_2001.
+
+```{r}
+graphs_learners_2001$train(train_task_2001)
+```
+
+It will contains the coefficients of feature selected from the model that we have trained before. It will be used to answer part c question. It's stored inside the coefficient_2001, then set it into data frame into coefficients_2001, then it will create a new column call Coefficient_2001 and the values contain inside will be the rownames of that dataframe, then it will rename the column names into Coefficient and Feature_Selected respectively.
+
+```{r}
+coefficient_2001 <- graphs_learners_2001$model$classif.log_reg$model$coefficients
+
+coefficients_2001 <- as.data.frame(coefficient_2001)
+
+coefficients_2001 <- coefficients_2001%>%
+  mutate(Coefficient_2001 = rownames(coefficients_2001))
+
+colnames(coefficients_2001) <- c("Coefficient","Feature_Selected")
+
+coefficients_2001 <- coefficients_2001%>%
+  mutate(Year_ = 2001) #Here, we will create a new column "Year_"that will be used in later part, for combination of coefficients across years.
+
+head(coefficients_2001) # show the top 5 rows
+```
+
+This is performed so that the data frame only contains the rows that have maximum value of Coefficient and minimum value of Coefficient. It has been done for visualisation purposes. Slice is being used to remove the first row which is always be intercept that might not useful for visualisation purpose
+
+```{r}
+conditions_2001 <- coefficients_2001%>%
+  slice(-1)%>%
+  filter(Coefficient ==max(Coefficient)|Coefficient==min(Coefficient))
+
+head(conditions_2001)#show the top 5 rows
+```
+
+The graph shows how the coefficient of each feature. It's ordered from the highest (postive coefficent) into the lowest (negative). Instead of x is Feature_selected and y is the Coefficient_2000, coord_flip has flip the y into x axis and vice versa.Then the labels will be shown only if it's in coditions_2000. The title of this graph is Coefficient of Logistic Regression in 2000 (Before), which mean this is all coefficient before removing p-value >0.05 after run model
+```{r}
+ggplot(coefficients_2001, aes(x= reorder(Feature_Selected, Coefficient), y= Coefficient))+
+  geom_col(fill="darkgreen")+
+  coord_flip()+
+  theme_minimal()+
+  geom_text(data=conditions_2001,aes(label = round(Coefficient,2)),size= 3, hjust= 0.9)+
+  labs(title= "Coefficient of Logistic Regression in 2001 (Before)", y= "Coefficient Value", x="Feature")
+
+```
+
+After the training have been done, the model will predict the test data (data_test_1_2001). Then score will be seen. As we use the classif.ce it will calculated the total error( wrong decision that model make, for example, when the Diverted is 0 it will predicted as 1 and vice versa).
+It shows that the error is around 0.00225 which is quite small. This might highly affected due to imbalance on data.
+
+```{r}
+predict_scores_2001 <- graphs_learners_2001$predict_newdata(data_test_1_2001)#use the train model to predict the test data which is not being seen during training
+
+cls_error_2001 <- predict_scores_2001$score() 
+
+cls_error_2001
+
+#classif.ce 
+#0.002250121  
+```
+
+
+
+Since the model is set to have proability instead of label, then threshold is able to be adjusted. When it's > 0.005 it will be considered as 1, rather than default which is 0.5. This due to the highly imbalance data. 
+```{r}
+
+testing_data_2001 <- data_test_1_2001%>%
+  mutate(Prediction_2001 = ifelse (predict_scores_2001$prob[,2]>0.005,1,0))
+
+```
+
+This will create the confusion matrix, to see how many 0 are predicted as 1 (False Positive), how many 1 is predicted as 0 (False Negative), how many 0 is predicted as 0 (True Negative), and how many 1 is predicted as 1 (True Positive). Therefore it can calculate how many percentage of accuracy, specifiticity, and sensitivity.
+```{r}
+matrix_cons_2001 <- table(Predicted= testing_data_2001$Prediction_2001, Actual= data_test_1_2001$Diverted)
+print(matrix_cons_2001)
+
+#Specificity => 96.3%
+#Sensitivity = 10.89%
+
+```
+
+This is the area under the curve. The closer to 1 the better it's. The model must have atleast more than 0.5, if not, it's not even better than guessing.
+The result in the sensitivity, specificity, and auc shows the model still have a room of improvement. Especially in the first run, there's quite a lot of feature that haven't been removed (P-value >0.05). The fact that data is highly imbalance, between 0 and 1 make the model difficult to predict. That's also the reason why threshold is adjusted in a low value rather than 0.5. There's possibility to use smote so that the data can be more balanced.  
+```{r}
+
+auc_2001 <- predict_scores_2001$score(msr("classif.auc"))
+auc_2001
+#classif.auc 
+#0.6349167 
+```
+
+
+First we will use the data in 2002. We will convert the categorical data such as day of week, day of month, and unique carrier into factor. This will be useful for logistic regression model in later part, since it was categorical data. For crs arr time and crs dep time, it will converted to numeric (it's treated as continuos rather than categorical).
+
+```{r}
+YEAR_2002<- US_Diverted_flight%>%
+  select(UniqueCarrier,Year, Diverted, CRSDepTime, Distance, CRSArrTime, DayofMonth, DayOfWeek)%>%
+  filter(Year== 2002)%>%
+  mutate(Diverted = as.factor(Diverted),
+         CRSDepTime  = as.numeric(CRSDepTime),
+         CRSArrTime = as.numeric(CRSArrTime),
+         UniqueCarrier = as.factor(UniqueCarrier),
+         DayOfWeek = as.factor(DayOfWeek),
+         DayofMonth = as.factor(DayofMonth))
+
+  
+```
+
+
+This will split the data from YEAR_2002 into 50% of training data and 50% testing data. The 50% is selected due to the big dataset. The index vector which is row number will be returned since it's set to be FALSE.
+
+Then the data_train_1_2002 will contains the data frame with rows that is indicated in data_training_2002 (row number) and the data itself is from YEAR_2002. This will be used to training data.
+
+The data_test_1_2002 is the data from YEAR_2002 that is not in data_train_2002. It will become the test data, for the model testing purpose.
+
+```{r}
+data_training_2002 <- createDataPartition(YEAR_2002$Diverted, p = 0.5, list = FALSE)
+
+data_train_1_2002 <- YEAR_2002%>%
+  slice(data_training_2002)
+data_test_1_2002 <- YEAR_2002%>%
+  slice(-data_training_2002)
+
+```
+
+The data_test_1_2002 will be used and it will be grouped by Diverted. Then the "Frequency" will be calulated based on the number of rows. So when the Diverted equals to 0, it will calculate the total rows that have 0 as the values of diverted.
+
+```{r}
+data_test_1_2002%>%
+  group_by(Diverted)%>%
+  summarise(Frequency = n())
+```
+
+This will train the model. 
+1. it will used the data from data_train_1_2002, with the name of task 'data_2002'. It used the classification task and creating a new object. Then it will targeting the Diverted(the variable we want to predict) which contains binary whether it is 0 or 1. 
+2. train_task_2002 will select only specific columns such as Distance, CRSDepTime, UniqueCarrier, DayOfWeek, and DayofMonth.
+3. Then the performance will be measured in class_error_2002, that compare the predicted probabilities with the actual true data. The lower it's the better. 
+4. We use the learner that previously have been set, which is logistic regression model with predicted probability that could be adjusted on threshold.
+5. This to ensure there's no missing value. In case there's missing value, then the mean of feature will be imputed in the NA's. Then it will pass into the model for training later.
+6. It will then used to build model, training the model using the feature selected, and make prediction in the future. 
+
+```{r}
+#1
+train_task_2002 <- TaskClassif$new('data_2002', backend = data_train_1_2002, target = 'Diverted')
+
+#2
+train_task_2002$select(c("Distance","CRSDepTime","UniqueCarrier","DayOfWeek" ,"DayofMonth","CRSArrTime"))
+
+#3
+class_error_2002 <- msr('classif.ce')
+
+#5
+graph_learn_2002 <- po('imputemean') %>>% po(learners)
+
+#6
+graphs_learners_2002 <- GraphLearner$new(graph_learn_2002)
+```
+This will allows the model that we have created before to perform training data using train_task_2002. The train data here is 50% that created before.
+
+```{r}
+graphs_learners_2002$train(train_task_2002)
+```
+
+It will contains the coefficients of feature selected from the model that we have trained before. It will be used to answer part c question. It's stored inside the coefficient_2002, then set it into data frame into coefficients_2002, then it will create a new column call Coefficient_2002 and the values contain inside will be the rownames of that dataframe, then it will rename the column names into Coefficient and Feature_Selected respectively.
+
+```{r}
+coefficient_2002 <- graphs_learners_2002$model$classif.log_reg$model$coefficients
+coefficients_2002 <- as.data.frame(coefficient_2002)
+
+coefficients_2002 <- coefficients_2002%>%
+  mutate(Coefficient_2002 = rownames(coefficients_2002))
+colnames(coefficients_2002) <- c("Coefficient","Feature_Selected")
+
+coefficients_2002 <- coefficients_2002%>%
+  mutate(Year_ = 2002) #Here, we will create a new column "Year_"that will be used in later part, for combination of coefficients across years.
+
+head(coefficients_2002)#show the top 5 rows
+```
+
+This is performed so that the data frame only contains the rows that have maximum value of Coefficient and minimum value of Coefficient. It has been done for visualisation purposes.
+
+```{r}
+conditions_2002 <- coefficients_2002%>%
+  slice(-1)%>%
+  filter(Coefficient ==max(Coefficient)|Coefficient==min(Coefficient))
+
+head(conditions_2002)#show the top 5 rows
+```
+The graph shows how the coefficient of each feature. It's ordered from the highest (postive coefficent) into the lowest (negative). Instead of x is Feature_selected and y is the Coefficient_2002, coord_flip has flip the y into x axis and vice versa.Then the labels will be shown only if it's in conditions_2002. The title of this graph is Coefficient of Logistic Regression in 2002 (Before).
+
+```{r}
+ggplot(coefficients_2002, aes(x= reorder(Feature_Selected, Coefficient), y= Coefficient))+
+  geom_col(fill="darkgreen")+
+  coord_flip()+
+  theme_minimal()+
+  geom_text(data=conditions_2002,aes(label = round(Coefficient,2)),size= 3, hjust= 0.9)+
+  labs(title= "Coefficient of Logistic Regression in 2002 (Before)", y= "Coefficient Value", x="Feature")
+
+```
+
+After the training have been done, the model will predict the test data (data_test_1_2002). Then score will be seen. As we use the classif.ce it will calculated the total error( wrong decision that model make, for example, when the Diverted is 0 it will predicted as 1 and vice versa).
+It shows that the error is around 0.001605 which is quite small. This might highly affected due to imbalance on data.
+
+```{r}
+predict_scores_2002 <- graphs_learners_2002$predict_newdata(data_test_1_2002)#use the train model to predict the test data which is not being seen during training
+
+cls_error_2002 <- predict_scores_2002$score() 
+
+cls_error_2002
+
+#classif.ce 
+#0.001605004   
+```
+
+
+
+Since the model is set to have proability instead of label, then threshold is able to be adjusted. When it's > 0.005 it will be considered as 1, rather than default which is 0.5. This due to the highly imbalance data. 
+```{r}
+
+testing_data_2002 <- data_test_1_2002%>%
+  mutate(Prediction_2002 = ifelse (predict_scores_2002$prob[,2]>0.005,1,0))
+
+```
+
+This will create the confusion matrix, to see how many 0 are predicted as 1 (False Positive), how many 1 is predicted as 0 (False Negative), how many 0 is predicted as 0 (True Negative), and how many 1 is predicted as 1 (True Positive). Therefore it can calculate how many percentage of accuracy, specifiticity, and sensitivity.
+```{r}
+matrix_cons_2002 <- table(Predicted= testing_data_2002$Prediction_2002, Actual= data_test_1_2002$Diverted)
+
+print(matrix_cons_2002)
+
+#Specificity => 99.1%
+#Sensitivity = 1.63%
+
+```
+
+This is the area under the curve. The closer to 1 the better it's. The model must have atleast more than 0.5, if not, it's not even better than guessing.
+The result in the sensitivity, specificity, and auc shows the model still have a room of improvement. Especially in the first run, there's quite a lot of feature that haven't been removed (P-value >0.05). The fact that data is highly imbalance, between 0 and 1 make the model difficult to predict. That's also the reason why threshold is adjusted in a low value rather than 0.5. There's possibility to use smote so that the data can be more balanced.  
+```{r}
+
+auc_2002 <- predict_scores_2002$score(msr("classif.auc"))
+auc_2002
+#classif.auc 
+#0.6423972  
+```
+
+
+First we will use the data in 2003. We will convert the categorical data such as day of week, day of month, and unique carrier into factor. This will be useful for logistic regression model in later part, since it was categorical data. For crs arr time and crs dep time, it will converted to numeric (it's treated as continuos rather than categorical).
+
+```{r}
+YEAR_2003 <- US_Diverted_flight%>%
+  select(UniqueCarrier,Year, Diverted, CRSDepTime, Distance, CRSArrTime, DayofMonth, DayOfWeek)%>%
+  filter(Year== 2003)%>%
+  mutate(Diverted = as.factor(Diverted),
+         CRSDepTime  = as.numeric(CRSDepTime),
+         CRSArrTime = as.numeric(CRSArrTime),
+         UniqueCarrier = as.factor(UniqueCarrier),
+         DayOfWeek = as.factor(DayOfWeek),
+         DayofMonth = as.factor(DayofMonth))
+
+  
+```
+
+
+This will split the data from YEAR_2003 into 50% of training data and 50% testing data. The 50% is selected due to the big dataset. The index vector which is row number will be returned since it's set to be FALSE.
+
+Then the data_train_1_2003 will contains the data frame with rows that is indicated in data_training_2003 (row number) and the data itself is from YEAR_2003. This will be used to training data.
+
+The data_test_1_2003 is the data from YEAR_2003 that is not in data_train_2003. It will become the test data, for the model testing purpose.
+
+```{r}
+data_training_2003 <- createDataPartition(YEAR_2003$Diverted, p = 0.5, list = FALSE)
+
+data_train_1_2003 <- YEAR_2003%>%
+  slice(data_training_2003)
+data_test_1_2003 <- YEAR_2003%>%
+  slice(-data_training_2003)
+
+```
+
+The data_test_1_2003 will be used and it will be grouped by Diverted. Then the "Frequency" will be calulated based on the number of rows. So when the Diverted equals to 0, it will calculate the total rows that have 0 as the values of diverted.
+
+```{r}
+data_test_1_2003%>%
+  group_by(Diverted)%>%
+  summarise(Frequency = n())
+```
+
+This will train the model. 
+1. it will used the data from data_train_1_2003, with the name of task 'data_2003'. It used the classification task and creating a new object. Then it will targeting the Diverted(the variable we want to predict) which contains binary whether it is 0 or 1. 
+2. train_task_2003 will select only specific columns such as Distance, CRSDepTime, UniqueCarrier, DayOfWeek, and DayofMonth.
+3. Then the performance will be measured in class_error_2003, that compare the predicted probabilities with the actual true data. The lower it's the better. 
+4. We use the learner that previously have been set, which is logistic regression model with predicted probability that could be adjusted on threshold.
+5. This to ensure there's no missing value. In case there's missing value, then the mean of feature will be imputed in the NA's. Then it will pass into the model for training later.
+6. It will then used to build model, training the model using the feature selected, and make prediction in the future. 
+
+```{r}
+#1
+train_task_2003 <- TaskClassif$new('data_2003', backend = data_train_1_2003, target = 'Diverted')
+
+#2
+train_task_2003$select(c("Distance","CRSDepTime","UniqueCarrier","DayOfWeek" ,"DayofMonth","CRSArrTime"))
+
+#3
+class_error_2003 <- msr('classif.ce')
+
+#5
+graph_learn_2003 <- po('imputemean') %>>% po(learners)
+
+#6
+graphs_learners_2003 <- GraphLearner$new(graph_learn_2003)
+```
+This will allows the model that we have created before to perform training data using train_task_2003.
+
+```{r}
+graphs_learners_2003$train(train_task_2003)
+```
+
+It will contains the coefficients of feature selected from the model that we have trained before. It will be used to answer part c question. It's stored inside the coefficient_2003, then set it into data frame into coefficients_2003, then it will create a new column call Coefficient_2003 and the values contain inside will be the rownames of that dataframe, then it will rename the column names into Coefficient and Feature_Selected respectively.
+
+```{r}
+coefficient_2003 <- graphs_learners_2003$model$classif.log_reg$model$coefficients
+
+coefficients_2003 <- as.data.frame(coefficient_2003)
+coefficients_2003 <- coefficients_2003%>%
+  mutate(Coefficient_2003 = rownames(coefficients_2003))
+colnames(coefficients_2003) <- c("Coefficient","Feature_Selected")
+
+coefficients_2003 <- coefficients_2003%>%
+  mutate(Year_ = 2003) #Here, we will create a new column "Year_"that will be used in later part, for combination of coefficients across years.
+
+head(coefficients_2003)
+```
+
+This is performed so that the data frame only contains the rows that have maximum value of Coefficient and minimum value of Coefficient. It has been done for visualisation purposes. The slice is used to remove the first row, since it always containt the Intercept which is useless for visualisation purpose.
+
+```{r}
+conditions_2003 <- coefficients_2003%>%
+  slice(-1)%>%
+  filter(Coefficient ==max(Coefficient)|Coefficient==min(Coefficient))
+
+head(conditions_2003)#show to 5 rows
+```
+The graph shows how the coefficient of each feature. It's ordered from the highest (postive coefficent) into the lowest (negative). Instead of x is Feature_selected and y is the Coefficient_2003, coord_flip has flip the y into x axis and vice versa.Then the labels will be shown only if it's in conditions_2003. The title of this graph is Coefficient of Logistic Regression in 2003 (Before).
+
+```{r}
+ggplot(coefficients_2003, aes(x= reorder(Feature_Selected, Coefficient), y= Coefficient))+
+  geom_col(fill="darkgreen")+
+  coord_flip()+
+  theme_minimal()+
+  geom_text(data=conditions_2003,aes(label = round(Coefficient,2)),size= 3, hjust= 0.9)+#the text here is coefficient with 2 decimal point and only plot when it is the highest and the lowest which is inside conditions_2003
+  labs(title= "Coefficient of Logistic Regression in 2003 (Before)", y= "Coefficient Value", x="Feature")
+
+```
+
+After the training have been done, the model will predict the test data (data_test_1_2003). Then score will be seen. As we use the classif.ce it will calculated the total error( wrong decision that model make, for example, when the Diverted is 0 it will predicted as 1 and vice versa).
+It shows that the error is around 0.00178 which is quite small. This might highly affected due to imbalance on data.
+
+```{r}
+predict_scores_2003 <- graphs_learners_2003$predict_newdata(data_test_1_2003)#use the train model to predict the test data which is not being seen during training
+
+cls_error_2003 <- predict_scores_2003$score() 
+
+cls_error_2003
+
+#classif.ce 
+#0.001781725   
+```
+
+
+
+Since the model is set to have proability instead of label, then threshold is able to be adjusted. When it's > 0.005 it will be considered as 1, rather than default which is 0.5. This due to the highly imbalance data. 
+```{r}
+
+testing_data_2003 <- data_test_1_2003%>%
+  mutate(Prediction_2003 = ifelse (predict_scores_2003$prob[,2]>0.005,1,0))
+
+```
+
+This will create the confusion matrix, to see how many 0 are predicted as 1 (False Positive), how many 1 is predicted as 0 (False Negative), how many 0 is predicted as 0 (True Negative), and how many 1 is predicted as 1 (True Positive). Therefore it can calculate how many percentage of accuracy, specifiticity, and sensitivity.
+```{r}
+matrix_cons_2003 <- table(Predicted= testing_data_2003$Prediction_2003, Actual= data_test_1_2003$Diverted)
+print(matrix_cons_2003)
+
+#Specificity => 98.63%
+#Sensitivity = 3.76%
+
+```
+
+This is the area under the curve. The closer to 1 the better it's. The model must have atleast more than 0.5, if not, it's not even better than guessing.
+The result in the sensitivity, specificity, and auc shows the model still have a room of improvement. Especially in the first run, there's quite a lot of feature that haven't been removed (P-value >0.05). The fact that data is highly imbalance, between 0 and 1 make the model difficult to predict. That's also the reason why threshold is adjusted in a low value rather than 0.5. There's possibility to use smote so that the data can be more balanced.  
+```{r}
+
+auc_2003 <- predict_scores_2003$score(msr("classif.auc"))
+auc_2003
+#classif.auc 
+#0.6358039  
+```
+
+
+First we will use the data in 2004. We will convert the categorical data such as day of week, day of month, and unique carrier into factor. This will be useful for logistic regression model in later part, since it was categorical data. For crs arr time and crs dep time, it will converted to numeric (it's treated as continuos rather than categorical).
+
+```{r}
+YEAR_2004 <- US_Diverted_flight%>%
+  select(UniqueCarrier,Year, Diverted, CRSDepTime, Distance, CRSArrTime, DayofMonth, DayOfWeek)%>%
+  filter(Year== 2004)%>%
+  mutate(Diverted = as.factor(Diverted),
+         CRSDepTime  = as.numeric(CRSDepTime),
+         CRSArrTime = as.numeric(CRSArrTime),
+         UniqueCarrier = as.factor(UniqueCarrier),
+         DayOfWeek = as.factor(DayOfWeek),
+         DayofMonth = as.factor(DayofMonth))
+
+  
+```
+
+
+This will split the data from YEAR_2004 into 50% of training data and 50% testing data. The 50% is selected due to the big dataset. The index vector which is row number will be returned since it's set to be FALSE.
+
+Then the data_train_1_2004 will contains the data frame with rows that is indicated in data_training_2004 (row number) and the data itself is from YEAR_2004. This will be used to training data.
+
+The data_test_1_2004 is the data from YEAR_2004 that is not in data_train_2004. It will become the test data, for the model testing purpose.
+
+```{r}
+data_training_2004 <- createDataPartition(YEAR_2004$Diverted, p = 0.5, list = FALSE)
+
+data_train_1_2004 <- YEAR_2004%>%
+  slice(data_training_2004)
+data_test_1_2004 <- YEAR_2004%>%
+  slice(-data_training_2004)
+
+```
+
+The data_test_1_2004 will be used and it will be grouped by Diverted. Then the "Frequency" will be calulated based on the number of rows. So when the Diverted equals to 0, it will calculate the total rows that have 0 as the values of diverted.
+
+```{r}
+data_test_1_2004%>%
+  group_by(Diverted)%>%
+  summarise(Frequency = n())
+```
+
+This will train the model. 
+1. it will used the data from data_train_1_2004, with the name of task 'data_2004'. It used the classification task and creating a new object. Then it will targeting the Diverted(the variable we want to predict) which contains binary whether it is 0 or 1. 
+2. train_task_2004 will select only specific columns such as Distance, CRSDepTime, UniqueCarrier, DayOfWeek, and DayofMonth.
+3. Then the performance will be measured in class_error_2004, that compare the predicted probabilities with the actual true data. The lower it's the better. 
+4. We use the learner that previously have been set, which is logistic regression model with predicted probability that could be adjusted on threshold.
+5. This to ensure there's no missing value. In case there's missing value, then the mean of feature will be imputed in the NA's. Then it will pass into the model for training later.
+6. It will then used to build model, training the model using the feature selected, and make prediction in the future. 
+
+```{r}
+#1
+train_task_2004 <- TaskClassif$new('data_2004', backend = data_train_1_2004, target = 'Diverted')
+
+#2
+train_task_2004$select(c("Distance","CRSDepTime","UniqueCarrier","DayOfWeek" ,"DayofMonth","CRSArrTime"))
+
+#3
+class_error_2004 <- msr('classif.ce')
+
+#5
+graph_learn_2004 <- po('imputemean') %>>% po(learners)
+
+#6
+graphs_learners_2004 <- GraphLearner$new(graph_learn_2004)
+```
+This will allows the model that we have created before to perform training data using train_task_2004.
+
+```{r}
+graphs_learners_2004$train(train_task_2004)
+```
+
+It will contains the coefficients of feature selected from the model that we have trained before. It will be used to answer part c question. It's stored inside the coefficient_2004, then set it into data frame into coefficients_2004, then it will create a new column call Coefficient_20004and the values contain inside will be the rownames of that dataframe, then it will rename the column names into Coefficient and Feature_Selected respectively.
+
+```{r}
+coefficient_2004 <- graphs_learners_2004$model$classif.log_reg$model$coefficients
+
+coefficients_2004 <- as.data.frame(coefficient_2004)
+
+coefficients_2004 <- coefficients_2004%>%
+  mutate(Coefficient_2004 = rownames(coefficients_2004))
+colnames(coefficients_2004) <- c("Coefficient","Feature_Selected")
+
+coefficients_2004 <- coefficients_2004%>%
+  mutate(Year_ = 2004) #Here, we will create a new column "Year_"that will be used in later part, for combination of coefficients across years.
+
+head(coefficients_2004)
+```
+
+This is performed so that the data frame only contains the rows that have maximum value of Coefficient_2004 and minimum value of Coefficient_2004. It has been done for visualisation purposes. The slice is used to remove the first row, since it always containt the Intercept which is useless for visualisation purpose.
+
+```{r}
+conditions_2004 <- coefficients_2004%>%
+  slice(-1)%>%
+  filter(Coefficient ==max(Coefficient)|Coefficient==min(Coefficient))
+
+head(conditions_2004)#show the top 5 rows
+```
+The graph shows how the coefficient of each feature. It's ordered from the highest (postive coefficent) into the lowest (negative). Instead of x is Feature_selected and y is the Coefficient_2004, coord_flip has flip the y into x axis and vice versa.Then the labels will be shown only if it's in coditions_2004. The title of this graph is Coefficient of Logistic Regression in 2004 (Before)
+
+```{r}
+ggplot(coefficients_2004, aes(x= reorder(Feature_Selected, Coefficient), y= Coefficient))+
+  geom_col(fill="darkgreen")+
+  coord_flip()+
+  theme_minimal()+
+  geom_text(data=conditions_2004,aes(label = round(Coefficient,2)),size= 3, hjust= 0.9)+
+  labs(title= "Coefficient of Logistic Regression in 2004 (Before)", y= "Coefficient Value", x="Feature")
+
+```
+
+After the training have been done, the model will predict the test data (data_test_1_2004). Then score will be seen. As we use the classif.ce it will calculated the total error( wrong decision that model make, for example, when the Diverted is 0 it will predicted as 1 and vice versa).
+It shows that the error is around 0.00197 which is quite small. This might highly affected due to imbalance on data.
+
+```{r}
+predict_scores_2004 <- graphs_learners_2004$predict_newdata(data_test_1_2004)
+#use the train model to predict the test data which is not being seen during training
+cls_error_2004 <- predict_scores_2004$score() 
+
+cls_error_2004
+
+#classif.ce 
+#0.001968718
+```
+
+
+
+Since the model is set to have proability instead of label, then threshold is able to be adjusted. When it's > 0.005 it will be considered as 1, rather than default which is 0.5. This due to the highly imbalance data. 
+```{r}
+
+testing_data_2004 <- data_test_1_2004%>%
+  mutate(Prediction_2004 = ifelse (predict_scores_2004$prob[,2]>0.005,1,0))
+
+```
+
+This will create the confusion matrix, to see how many 0 are predicted as 1 (False Positive), how many 1 is predicted as 0 (False Negative), how many 0 is predicted as 0 (True Negative), and how many 1 is predicted as 1 (True Positive). Therefore it can calculate how many percentage of accuracy, specifiticity, and sensitivity.
+```{r}
+matrix_cons_2004 <- table(Predicted= testing_data_2004$Prediction_2004, Actual= data_test_1_2004$Diverted)
+print(matrix_cons_2004)
+
+#Specificity => 98.3%
+#Sensitivity = 4.9%
+
+```
+
+This is the area under the curve. The closer to 1 the better it's. The model must have atleast more than 0.5, if not, it's not even better than guessing.
+The result in the sensitivity, specificity, and auc shows the model still have a room of improvement. The fact that data is highly imbalance, between 0 and 1 make the model difficult to predict. That's also the reason why threshold is adjusted in a low value rather than 0.5. There's possibility to use smote so that the data can be more balanced.  
+```{r}
+
+auc_2004 <- predict_scores_2004$score(msr("classif.auc"))
+auc_2004
+#classif.auc 
+#0.6318551
+```
+
+
+This will combine the conditions above into one data frame. The combined_coefficient is also combine the coefficients stored previously by row.
+```{r}
+combined_conditions <- rbind(conditions_2000, conditions_2001,conditions_2002,conditions_2003,conditions_2004) #by row combine the conditions needed for visualisation purposes
+
+combined_coefficient <- rbind(coefficients_2000,coefficients_2001,coefficients_2002,coefficients_2003,coefficients_2004) #combine it by row for the coefficient data in 2000-2004
+         
+head(combined_coefficient)#show the top 5 rows from combined_coefficient data
+
+
+```
+
+It will plot the combined_coefficient. The Feature_Selected is on the x axis that ordered by Coefficients, while in y axis will be the Coefficient. Then the graph will plot the x and y axis in reverse way. So the x axis will be plot on y axis and vice versa. Then for data that's in combined_conditions, which is the maximum and minimum coefficient in each year, it will be showed as label with 2 decimals point. 
+```{r}
+ggplot(combined_coefficient, aes(x= reorder(Feature_Selected,Coefficient ), y= Coefficient))+
+  geom_col(fill= "darkgreen")+
+  coord_flip()+#flip x axis to y and vice versa
+  theme_minimal()+
+  geom_text(data=combined_conditions,aes(label = round(Coefficient,2)),size= 3, hjust= 0.9)+ #add label where the data is from combined conditions and it will plot based on 2 decimal point of Coefficient column, with size of text is 3 and the position will also adjusted horizontally
+  labs(title= "Coefficient of Logistic Regression in 2000-2004", y= "Coefficient Value", x="Feature")+
+  facet_wrap(~Year_)+#per year
+  theme(axis.text.y = element_text(size=5))
+
+```
+The importance_features are contains features that have high coefficient and it's available in all 5 years from 2000 to 2001 such as UniqueCarrier HP and AS, DayofMonth 11 and 31. 
+
+Then it will plot a line graph, where the coefficient is on the y axis, while the year is on the x axis.
+```{r}
+importance_features <- combined_coefficient%>%
+  filter(Feature_Selected == "UniqueCarrierHP"|Feature_Selected == "UniqueCarrierAS"|Feature_Selected == "DayofMonth11"|Feature_Selected == "DayofMonth31")
+
+ggplot(importance_features, aes(x= Year_, y =Coefficient, colour = Feature_Selected))+
+  geom_line()+
+  theme_minimal()+
+  labs(title="Coefficients of Selected Features Across Years", x= "Year", colour= "Features")
+```
+
+The less_features are those that seems have low coefficients but actually have meaningful impact. For example, CRSDepTime, CRSArrTime, and Distance. These features have very low coefficient, however CRSDepTime and CRSArrTime is in 0 to 2400 range. It means that the coefficient will rises when the time is increases. The distance also in miles unit, the higher the miles the higher the coefficient is. 
+
+less_features will use combined_coefficients data, that take only some features. Then it will show line graph, to show how the coefficient change from 2000 to 2004.
+
+```{r}
+less_features <- combined_coefficient%>%
+  filter(Feature_Selected == "CRSDepTime"|Feature_Selected == "CRSArrTime"|Feature_Selected == "Distance")
+
+ggplot(less_features, aes(x= Year_, y =Coefficient, colour = Feature_Selected))+
+  geom_line()+
+  theme_minimal()+
+  labs(title="Coefficients of Selected Features Across Years", x= "Year", colour= "Features")
+
+
+
+```
+
+
