@@ -11,7 +11,7 @@ The project was implemented in both **R and Python**, with functions used to aut
 
 ## Overview
 
-This coursework combines statistical simulation and real-world flight data analysis. The first part uses the Metropolis-Hastings algorithm to generate random samples and study convergence. The second part analyzes airline delays, plane age effects, and flight diversion patterns using historical flight data from 2000 to 2004. :contentReference[oaicite:3]{index=3} :contentReference[oaicite:4]{index=4}
+This coursework combines statistical simulation and real-world flight data analysis. The first part uses the Metropolis-Hastings algorithm to generate random samples and study convergence. The second part analyzes airline delays, plane age effects, and flight diversion patterns using historical flight data from 2000 to 2004. 
 
 ---
 
@@ -32,13 +32,13 @@ The first section implements a Metropolis-Hastings algorithm to generate samples
 - R-hat convergence diagnostics
 - Sample mean and standard deviation estimates
 
-The report shows that the generated samples approximate the target distribution well, and that smaller step sizes can slow convergence while larger step sizes improve stability after a point. :contentReference[oaicite:5]{index=5} :contentReference[oaicite:6]{index=6}
+The report shows that the generated samples approximate the target distribution well, and that smaller step sizes can slow convergence while larger step sizes improve stability after a point. 
 
 ---
 
 ## Part 2: Flight Delay Analysis (2000–2004)
 
-This section uses flight data from Harvard Dataverse covering five years, 2000 to 2004. The data was read from CSV files and automated using functions in both R and Python. Delay was defined as a flight arriving or departing 15 minutes or more late, and departure delay and arrival delay were analyzed separately to avoid double counting. :contentReference[oaicite:7]{index=7}
+This section uses flight data from Harvard Dataverse covering five years, 2000 to 2004. The data was read from CSV files and automated using functions in both R and Python. Delay was defined as a flight arriving or departing 15 minutes or more late, and departure delay and arrival delay were analyzed separately to avoid double counting. 
 
 ### Objectives
 - Identify the best day of the week to fly
